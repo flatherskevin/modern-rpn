@@ -191,14 +191,10 @@ struct ContentView: View {
                 GridRow {
                     ForEach(Array(row.enumerated()), id: \.offset) { _, button in
                         Button(action: button.action) {
-                            Text(button.label)
-                                .font(.system(size: buttonFontSize(button.label), weight: .medium, design: .rounded))
-                                .minimumScaleFactor(0.45)
-                                .lineLimit(1)
-                                .foregroundStyle(button.textColor)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            buttonLabelView(for: button)
                         }
                         .frame(maxWidth: .infinity)
+                        .accessibilityLabel(button.label)
                         .buttonStyle(CalculatorPressStyle(color: button.color, span: button.span))
                         .gridCellColumns(button.span)
                     }
@@ -207,9 +203,42 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private func buttonLabelView(for button: CalculatorButtonStyle) -> some View {
+        if let symbolName = operatorSymbolName(button.label) {
+            Image(systemName: symbolName)
+                .font(.system(size: buttonFontSize(button.label), weight: .semibold))
+                .foregroundStyle(button.textColor)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        } else {
+            Text(button.label)
+                .font(.system(size: buttonFontSize(button.label), weight: .medium, design: .rounded))
+                .minimumScaleFactor(0.45)
+                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(button.textColor)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        }
+    }
+
     private func buttonFontSize(_ label: String) -> CGFloat {
-        if ["÷", "×", "−", "+"].contains(label) { return 52 }
+        if ["÷", "×", "−", "+"].contains(label) { return 44 }
         return 34
+    }
+
+    private func operatorSymbolName(_ label: String) -> String? {
+        switch label {
+        case "+":
+            return "plus"
+        case "−":
+            return "minus"
+        case "×":
+            return "multiply"
+        case "÷":
+            return "divide"
+        default:
+            return nil
+        }
     }
 }
 
