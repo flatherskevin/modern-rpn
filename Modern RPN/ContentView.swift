@@ -75,6 +75,7 @@ private struct CalculatorPressStyle: ButtonStyle {
 struct ContentView: View {
     @StateObject private var viewModel = CalculatorViewModel()
     @State private var showingHistory = false
+    @State private var showingPrivacyPolicy = false
 
     var body: some View {
         ZStack {
@@ -96,21 +97,38 @@ struct ContentView: View {
             HistoryView(store: viewModel.historyStore)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showingPrivacyPolicy) {
+            PrivacyPolicyView()
+                .presentationDetents([.medium, .large])
+        }
     }
 
     private var header: some View {
         HStack {
-            Button("History") {
-                showingHistory = true
-            }
-            .font(.system(size: 18, weight: .semibold, design: .rounded))
-            .foregroundStyle(CalculatorColor.displayText)
+            Menu {
+                Button("History") {
+                    showingHistory = true
+                }
 
-            Spacer()
+                Button("Privacy Policy") {
+                    showingPrivacyPolicy = true
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(CalculatorColor.displayText)
+                    .frame(width: 44, height: 44, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(viewModel.mode == .basic ? "Modern RPN" : "Modern RPN Scientific")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(CalculatorColor.stackText)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
         }
     }
 
@@ -288,6 +306,145 @@ private struct HistoryView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
     }
+}
+
+private struct PrivacyPolicyView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private let sections = PrivacyPolicyContent.sections
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(PrivacyPolicyContent.intro)
+                        .font(.system(size: 16, weight: .regular, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.92))
+
+                    ForEach(sections) { section in
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(section.title)
+                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+
+                            ForEach(section.paragraphs, id: \.self) { paragraph in
+                                Text(paragraph)
+                                    .font(.system(size: 15, weight: .regular, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.88))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            ForEach(section.bullets, id: \.self) { bullet in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("•")
+                                        .foregroundStyle(.white.opacity(0.88))
+                                    Text(bullet)
+                                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                                        .foregroundStyle(.white.opacity(0.88))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
+                .padding(16)
+            }
+            .background(CalculatorColor.historyBackground)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .navigationTitle("Privacy Policy")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+private enum PrivacyPolicyContent {
+    static let intro = "Effective date: March 11, 2026\n\nModern RPN is designed to work entirely on your device. It does not require an account and does not send your calculator activity to the developer or to third parties."
+
+    static let sections: [PrivacyPolicySection] = [
+        .init(
+            title: "Information We Store",
+            paragraphs: [
+                "Modern RPN does not collect personal information through developer-operated servers, analytics systems, advertising SDKs, or third-party tracking tools.",
+                "To provide the in-app History feature, the app stores limited information locally on your device."
+            ],
+            bullets: [
+                "Calculation history, including expressions, results, timestamps, and stack snapshots."
+            ]
+        ),
+        .init(
+            title: "How Information Is Used",
+            paragraphs: [
+                "Locally stored calculation history is used only to show your history inside the app."
+            ],
+            bullets: [
+                "No advertising use",
+                "No marketing use",
+                "No analytics or profiling",
+                "No cross-app or cross-site tracking"
+            ]
+        ),
+        .init(
+            title: "Sharing",
+            paragraphs: [
+                "Modern RPN does not sell, rent, share, or otherwise disclose your data to the developer, advertisers, analytics providers, or other third parties through the app."
+            ]
+        ),
+        .init(
+            title: "Retention and Deletion",
+            paragraphs: [
+                "Your calculation history remains on your device until you delete it.",
+                "You can clear stored history at any time from the History screen. Removing the app also removes the app's local data, subject to how your device and backups are managed by Apple.",
+                "Because Modern RPN does not maintain developer-accessible user accounts or servers that store your app data, the developer cannot access, correct, export, or delete your local history remotely."
+            ]
+        ),
+        .init(
+            title: "Permissions and Sensitive Data",
+            paragraphs: [
+                "Modern RPN does not request access to location, contacts, photos, camera, microphone, health data, tracking, or similar sensitive device permissions."
+            ]
+        ),
+        .init(
+            title: "Children's Privacy",
+            paragraphs: [
+                "Modern RPN is not directed to children under 13, and the app does not knowingly collect personal information from children."
+            ]
+        ),
+        .init(
+            title: "Security",
+            paragraphs: [
+                "Modern RPN is designed to reduce privacy risk by keeping calculation history on device and not transmitting it to the developer or third parties through the app.",
+                "No method of electronic storage is guaranteed to be completely secure, but the app is intentionally limited to local storage for its core functionality."
+            ]
+        ),
+        .init(
+            title: "Policy Changes",
+            paragraphs: [
+                "This privacy policy is intended to reflect Modern RPN's current privacy practices as accurately as reasonably possible based on the developer's knowledge of the app.",
+                "If an inaccuracy, omission, or mismatch between this policy and the app's actual behavior is identified, the developer intends to correct the issue when reasonably possible, either by updating the app's behavior or by revising this privacy policy.",
+                "Any policy updates will be reflected in the app with a revised effective date. If a future version of Modern RPN adds features that collect, transmit, or share data, this privacy policy will be updated before those changes are released."
+            ]
+        ),
+        .init(
+            title: "Contact",
+            paragraphs: [
+                "Privacy questions about Modern RPN can be directed to your published support or privacy contact."
+            ]
+        )
+    ]
+}
+
+private struct PrivacyPolicySection: Identifiable {
+    let id = UUID()
+    let title: String
+    var paragraphs: [String]
+    var bullets: [String] = []
 }
 
 #Preview {
