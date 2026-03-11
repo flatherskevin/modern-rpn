@@ -311,17 +311,20 @@ private struct HistoryView: View {
 private struct PrivacyPolicyView: View {
     @Environment(\.dismiss) private var dismiss
 
-    private let sections = PrivacyPolicyContent.sections
+    private let document = PrivacyPolicyDocument.load()
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text(PrivacyPolicyContent.intro)
-                        .font(.system(size: 16, weight: .regular, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.92))
+                    ForEach(document.preface, id: \.self) { paragraph in
+                        Text(paragraph)
+                            .font(.system(size: 16, weight: .regular, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
 
-                    ForEach(sections) { section in
+                    ForEach(document.sections) { section in
                         VStack(alignment: .leading, spacing: 10) {
                             Text(section.title)
                                 .font(.system(size: 18, weight: .semibold, design: .rounded))
@@ -358,90 +361,97 @@ private struct PrivacyPolicyView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .navigationTitle("Privacy Policy")
+            .navigationTitle(document.title)
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
 
-private enum PrivacyPolicyContent {
-    static let intro = "Effective date: March 11, 2026\n\nModern RPN is designed to work entirely on your device. It does not require an account and does not send your calculator activity to the developer or to third parties."
+private struct PrivacyPolicyDocument {
+    let title: String
+    let preface: [String]
+    let sections: [PrivacyPolicySection]
 
-    static let sections: [PrivacyPolicySection] = [
-        .init(
-            title: "Information We Store",
-            paragraphs: [
-                "Modern RPN does not collect personal information through developer-operated servers, analytics systems, advertising SDKs, or third-party tracking tools.",
-                "To provide the in-app History feature, the app stores limited information locally on your device."
-            ],
-            bullets: [
-                "Calculation history, including expressions, results, timestamps, and stack snapshots."
-            ]
-        ),
-        .init(
-            title: "How Information Is Used",
-            paragraphs: [
-                "Locally stored calculation history is used only to show your history inside the app."
-            ],
-            bullets: [
-                "No advertising use",
-                "No marketing use",
-                "No analytics or profiling",
-                "No cross-app or cross-site tracking"
-            ]
-        ),
-        .init(
-            title: "Sharing",
-            paragraphs: [
-                "Modern RPN does not sell, rent, share, or otherwise disclose your data to the developer, advertisers, analytics providers, or other third parties through the app."
-            ]
-        ),
-        .init(
-            title: "Retention and Deletion",
-            paragraphs: [
-                "Your calculation history remains on your device until you delete it.",
-                "You can clear stored history at any time from the History screen. Removing the app also removes the app's local data, subject to how your device and backups are managed by Apple.",
-                "Because Modern RPN does not maintain developer-accessible user accounts or servers that store your app data, the developer cannot access, correct, export, or delete your local history remotely."
-            ]
-        ),
-        .init(
-            title: "Permissions and Sensitive Data",
-            paragraphs: [
-                "Modern RPN does not request access to location, contacts, photos, camera, microphone, health data, tracking, or similar sensitive device permissions."
-            ]
-        ),
-        .init(
-            title: "Children's Privacy",
-            paragraphs: [
-                "Modern RPN is not directed to children under 13, and the app does not knowingly collect personal information from children."
-            ]
-        ),
-        .init(
-            title: "Security",
-            paragraphs: [
-                "Modern RPN is designed to reduce privacy risk by keeping calculation history on device and not transmitting it to the developer or third parties through the app.",
-                "No method of electronic storage is guaranteed to be completely secure, but the app is intentionally limited to local storage for its core functionality."
-            ]
-        ),
-        .init(
-            title: "Policy Changes",
-            paragraphs: [
-                "This privacy policy is intended to reflect Modern RPN's current privacy practices as accurately as reasonably possible based on the developer's knowledge of the app.",
-                "If an inaccuracy, omission, or mismatch between this policy and the app's actual behavior is identified, the developer intends to correct the issue when reasonably possible, either by updating the app's behavior or by revising this privacy policy.",
-                "Any policy updates will be reflected in the app with a revised effective date. If a future version of Modern RPN adds features that collect, transmit, or share data, this privacy policy will be updated before those changes are released."
-            ]
-        ),
-        .init(
-            title: "Contact",
-            paragraphs: [
-                "Privacy questions about Modern RPN can be directed to your published support or privacy contact."
-            ]
-        )
-    ]
+    static func load(bundle: Bundle = .main) -> PrivacyPolicyDocument {
+        guard let url = bundle.url(forResource: "PrivacyPolicy", withExtension: "md"),
+              let content = try? String(contentsOf: url, encoding: .utf8) else {
+            return PrivacyPolicyDocument(
+                title: "Privacy Policy",
+                preface: ["Privacy policy content is currently unavailable in this build."],
+                sections: []
+            )
+        }
+
+        return parse(content)
+    }
+
+    private static func parse(_ content: String) -> PrivacyPolicyDocument {
+        let lines = content.components(separatedBy: .newlines)
+        var title = "Privacy Policy"
+        var preface: [String] = []
+        var sections: [PrivacyPolicySection] = []
+        var currentSection: PrivacyPolicySection?
+        var paragraphBuffer: [String] = []
+
+        func flushParagraph() {
+            guard !paragraphBuffer.isEmpty else { return }
+            let paragraph = paragraphBuffer.joined(separator: " ")
+            if var section = currentSection {
+                section.paragraphs.append(paragraph)
+                currentSection = section
+                sections[sections.count - 1] = section
+            } else {
+                preface.append(paragraph)
+            }
+            paragraphBuffer.removeAll()
+        }
+
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+
+            if line.isEmpty {
+                flushParagraph()
+                continue
+            }
+
+            if line.hasPrefix("# ") {
+                flushParagraph()
+                title = String(line.dropFirst(2))
+                continue
+            }
+
+            if line.hasPrefix("## ") {
+                flushParagraph()
+                let section = PrivacyPolicySection(
+                    title: String(line.dropFirst(3)),
+                    paragraphs: [],
+                    bullets: []
+                )
+                sections.append(section)
+                currentSection = section
+                continue
+            }
+
+            if line.hasPrefix("- ") {
+                flushParagraph()
+                guard var section = currentSection else { continue }
+                section.bullets.append(String(line.dropFirst(2)))
+                currentSection = section
+                sections[sections.count - 1] = section
+                continue
+            }
+
+            paragraphBuffer.append(line)
+        }
+
+        flushParagraph()
+
+        return PrivacyPolicyDocument(title: title, preface: preface, sections: sections)
+    }
 }
 
 private struct PrivacyPolicySection: Identifiable {
-    let id = UUID()
+    var id: String { title }
     let title: String
     var paragraphs: [String]
     var bullets: [String] = []
