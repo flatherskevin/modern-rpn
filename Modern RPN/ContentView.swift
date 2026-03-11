@@ -75,6 +75,7 @@ private struct CalculatorPressStyle: ButtonStyle {
 struct ContentView: View {
     @StateObject private var viewModel = CalculatorViewModel()
     @State private var showingHistory = false
+    @State private var showingPrivacyPolicy = false
 
     var body: some View {
         ZStack {
@@ -96,21 +97,38 @@ struct ContentView: View {
             HistoryView(store: viewModel.historyStore)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showingPrivacyPolicy) {
+            PrivacyPolicyView()
+                .presentationDetents([.medium, .large])
+        }
     }
 
     private var header: some View {
         HStack {
-            Button("History") {
-                showingHistory = true
-            }
-            .font(.system(size: 18, weight: .semibold, design: .rounded))
-            .foregroundStyle(CalculatorColor.displayText)
+            Menu {
+                Button("History") {
+                    showingHistory = true
+                }
 
-            Spacer()
+                Button("Privacy Policy") {
+                    showingPrivacyPolicy = true
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(CalculatorColor.displayText)
+                    .frame(width: 44, height: 44, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(viewModel.mode == .basic ? "Modern RPN" : "Modern RPN Scientific")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(CalculatorColor.stackText)
+                .frame(maxWidth: .infinity, alignment: .center)
+
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
         }
     }
 
@@ -288,6 +306,155 @@ private struct HistoryView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
     }
+}
+
+private struct PrivacyPolicyView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private let document = PrivacyPolicyDocument.load()
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach(document.preface, id: \.self) { paragraph in
+                        Text(paragraph)
+                            .font(.system(size: 16, weight: .regular, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    ForEach(document.sections) { section in
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(section.title)
+                                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.white)
+
+                            ForEach(section.paragraphs, id: \.self) { paragraph in
+                                Text(paragraph)
+                                    .font(.system(size: 15, weight: .regular, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.88))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            ForEach(section.bullets, id: \.self) { bullet in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Text("•")
+                                        .foregroundStyle(.white.opacity(0.88))
+                                    Text(bullet)
+                                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                                        .foregroundStyle(.white.opacity(0.88))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                }
+                .padding(16)
+            }
+            .background(CalculatorColor.historyBackground)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .navigationTitle(document.title)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+private struct PrivacyPolicyDocument {
+    let title: String
+    let preface: [String]
+    let sections: [PrivacyPolicySection]
+
+    static func load(bundle: Bundle = .main) -> PrivacyPolicyDocument {
+        guard let url = bundle.url(forResource: "PrivacyPolicy", withExtension: "md"),
+              let content = try? String(contentsOf: url, encoding: .utf8) else {
+            return PrivacyPolicyDocument(
+                title: "Privacy Policy",
+                preface: ["Privacy policy content is currently unavailable in this build."],
+                sections: []
+            )
+        }
+
+        return parse(content)
+    }
+
+    private static func parse(_ content: String) -> PrivacyPolicyDocument {
+        let lines = content.components(separatedBy: .newlines)
+        var title = "Privacy Policy"
+        var preface: [String] = []
+        var sections: [PrivacyPolicySection] = []
+        var currentSection: PrivacyPolicySection?
+        var paragraphBuffer: [String] = []
+
+        func flushParagraph() {
+            guard !paragraphBuffer.isEmpty else { return }
+            let paragraph = paragraphBuffer.joined(separator: " ")
+            if var section = currentSection {
+                section.paragraphs.append(paragraph)
+                currentSection = section
+                sections[sections.count - 1] = section
+            } else {
+                preface.append(paragraph)
+            }
+            paragraphBuffer.removeAll()
+        }
+
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+
+            if line.isEmpty {
+                flushParagraph()
+                continue
+            }
+
+            if line.hasPrefix("# ") {
+                flushParagraph()
+                title = String(line.dropFirst(2))
+                continue
+            }
+
+            if line.hasPrefix("## ") {
+                flushParagraph()
+                let section = PrivacyPolicySection(
+                    title: String(line.dropFirst(3)),
+                    paragraphs: [],
+                    bullets: []
+                )
+                sections.append(section)
+                currentSection = section
+                continue
+            }
+
+            if line.hasPrefix("- ") {
+                flushParagraph()
+                guard var section = currentSection else { continue }
+                section.bullets.append(String(line.dropFirst(2)))
+                currentSection = section
+                sections[sections.count - 1] = section
+                continue
+            }
+
+            paragraphBuffer.append(line)
+        }
+
+        flushParagraph()
+
+        return PrivacyPolicyDocument(title: title, preface: preface, sections: sections)
+    }
+}
+
+private struct PrivacyPolicySection: Identifiable {
+    var id: String { title }
+    let title: String
+    var paragraphs: [String]
+    var bullets: [String] = []
 }
 
 #Preview {
