@@ -22,17 +22,22 @@ final class RPNCalculator {
         }
     }
 
+    private(set) var mode: CalculatorMode
     private(set) var stack: [Double] = []
     private(set) var inputBuffer: String = "0"
     private(set) var isTyping = false
     private(set) var errorMessage: String?
+
+    init(mode: CalculatorMode = .standard) {
+        self.mode = mode
+    }
 
     var displayText: String {
         if isTyping {
             return inputBuffer
         }
         guard let top = stack.last else { return "0" }
-        return Self.format(top)
+        return mode.format(top)
     }
 
     var stackLines: [String] {
@@ -42,29 +47,62 @@ final class RPNCalculator {
 
         return zip(labels, padded).map { label, value in
             if let value {
-                return "\(label): \(Self.format(value))"
+                return "\(label): \(mode.format(value))"
             }
             return "\(label):"
         }
     }
 
+    func setMode(_ mode: CalculatorMode) {
+        if isTyping, let value = self.mode.parse(inputBuffer) {
+            inputBuffer = mode.format(value)
+        }
+
+        self.mode = mode
+    }
+
+    func restore(session: CalculatorSession) {
+        mode = session.mode
+        stack = session.stack
+        inputBuffer = session.inputBuffer
+        isTyping = session.isTyping
+        errorMessage = nil
+    }
+
+    var session: CalculatorSession {
+        CalculatorSession(
+            mode: mode,
+            stack: stack,
+            inputBuffer: inputBuffer,
+            isTyping: isTyping
+        )
+    }
+
     func tapDigit(_ digit: String) {
-        guard digit.count == 1, digit.first?.isNumber == true else { return }
+        guard let normalizedDigit = mode.normalizeDigit(digit) else { return }
         errorMessage = nil
 
         if isTyping {
+            if !mode.canAppend(to: inputBuffer) {
+                inputBuffer = normalizedDigit
+                return
+            }
+
             if inputBuffer == "0" {
-                inputBuffer = digit
+                inputBuffer = normalizedDigit
+            } else if inputBuffer == "-0" {
+                inputBuffer = "-" + normalizedDigit
             } else {
-                inputBuffer.append(digit)
+                inputBuffer.append(normalizedDigit)
             }
         } else {
-            inputBuffer = digit
+            inputBuffer = normalizedDigit
             isTyping = true
         }
     }
 
     func tapDecimal() {
+        guard mode.supportsDecimalInput else { return }
         errorMessage = nil
 
         if isTyping {
@@ -98,7 +136,7 @@ final class RPNCalculator {
         errorMessage = nil
 
         if isTyping {
-            guard let value = Double(inputBuffer) else {
+            guard let value = mode.parse(inputBuffer) else {
                 errorMessage = "Invalid number"
                 return nil
             }
@@ -181,27 +219,23 @@ final class RPNCalculator {
         stack.append(result)
 
         return OperationResult(
-            expression: "\(Self.format(lhs)) \(operation.rawValue) \(Self.format(rhs))",
+            mode: mode,
+            expression: "\(mode.format(lhs)) \(operation.rawValue) \(mode.format(rhs))",
             result: result,
+            resultText: mode.format(result),
             stackSnapshot: stack
         )
     }
 
     static func format(_ value: Double) -> String {
-        if value == .infinity { return "∞" }
-        if value == -.infinity { return "-∞" }
-        if value.isNaN { return "NaN" }
-
-        if value.rounded() == value {
-            return String(format: "%.0f", value)
-        }
-
-        return String(format: "%.10g", value)
+        RPNNumberFormatter.formatDecimal(value)
     }
 }
 
 struct OperationResult {
+    let mode: CalculatorMode
     let expression: String
     let result: Double
+    let resultText: String
     let stackSnapshot: [Double]
 }
