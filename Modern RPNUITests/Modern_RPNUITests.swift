@@ -10,6 +10,7 @@ final class Modern_RPNUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
+        XCTAssertTrue(app.buttons["mode-picker"].exists)
         XCTAssertTrue(app.buttons["⌫"].exists)
         XCTAssertTrue(app.buttons["AC"].exists)
         XCTAssertTrue(app.buttons["POP"].exists)
@@ -44,12 +45,47 @@ final class Modern_RPNUITests: XCTestCase {
     }
 
     @MainActor
+    func testModeSwitchShowsHexAndBinaryKeypads() {
+        let app = XCUIApplication()
+        app.launch()
+
+        app.buttons["mode-picker"].tap()
+        app.buttons["Hex"].tap()
+
+        XCTAssertTrue(app.buttons["A"].exists)
+        XCTAssertTrue(app.buttons["F"].exists)
+        XCTAssertFalse(app.buttons["."].exists)
+
+        app.buttons["mode-picker"].tap()
+        app.buttons["Binary"].tap()
+
+        XCTAssertTrue(app.buttons["1"].exists)
+        XCTAssertTrue(app.buttons["0"].exists)
+        XCTAssertFalse(app.buttons["A"].exists)
+        XCTAssertFalse(app.buttons["."].exists)
+    }
+
+    @MainActor
+    func testHexAdditionFlowUpdatesDisplay() {
+        let app = XCUIApplication()
+        app.launch()
+
+        app.buttons["mode-picker"].tap()
+        app.buttons["Hex"].tap()
+
+        tap(app, sequence: ["A", "ENTER", "5", "ENTER", "+"])
+
+        XCTAssertEqual(displayValue(in: app).label, "F")
+    }
+
+    @MainActor
     func testHistoryShowsAndClearsEntries() {
         let app = XCUIApplication()
         app.launch()
 
         tap(app, sequence: ["2", "ENTER", "3", "ENTER", "+"])
 
+        app.buttons["menu-button"].tap()
         app.buttons["History"].tap()
 
         let expression = app.staticTexts["2 + 3"]
@@ -59,7 +95,7 @@ final class Modern_RPNUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["No history yet"].waitForExistence(timeout: 2))
 
         app.buttons["Done"].tap()
-        XCTAssertTrue(app.buttons["History"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["menu-button"].waitForExistence(timeout: 2))
     }
 
     @MainActor

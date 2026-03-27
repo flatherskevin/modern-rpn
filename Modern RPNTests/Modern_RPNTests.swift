@@ -45,6 +45,37 @@ final class RPNCalculatorTests: XCTestCase {
         XCTAssertEqual(calculator.inputBuffer, "0.31")
     }
 
+    func testHexModeAcceptsHexDigitsAndFormatsStack() {
+        let calculator = RPNCalculator(mode: .hex)
+
+        calculator.tapDigit("A")
+        calculator.tapDigit("f")
+        _ = calculator.enter()
+
+        XCTAssertEqual(calculator.displayText, "AF")
+        XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: AF"])
+    }
+
+    func testBinaryModeRejectsNonBinaryDigits() {
+        let calculator = RPNCalculator(mode: .binary)
+
+        calculator.tapDigit("1")
+        calculator.tapDigit("2")
+
+        XCTAssertEqual(calculator.inputBuffer, "1")
+    }
+
+    func testHexModeShowsFractionalResultsInDecimal() {
+        let calculator = RPNCalculator(mode: .hex)
+        push(3, onto: calculator)
+        push(2, onto: calculator)
+
+        let outcome = calculator.perform(.divide)
+
+        XCTAssertEqual(outcome?.resultText, "1.5")
+        XCTAssertEqual(calculator.displayText, "1.5")
+    }
+
     func testToggleSignForTypingValue() {
         let calculator = RPNCalculator()
 
@@ -259,6 +290,16 @@ final class RPNCalculatorTests: XCTestCase {
         XCTAssertEqual(RPNCalculator.format(.nan), "NaN")
     }
 
+    func testModeSwitchReformatsExistingStack() {
+        let calculator = RPNCalculator()
+        push(15, onto: calculator)
+
+        calculator.setMode(.hex)
+
+        XCTAssertEqual(calculator.displayText, "F")
+        XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: F"])
+    }
+
     private func push(_ value: Double, onto calculator: RPNCalculator) {
         let formatted = RPNCalculator.format(value)
         for char in formatted {
@@ -288,19 +329,20 @@ final class HistoryStoreTests: XCTestCase {
         let defaults = makeDefaults()
         let store = makeStore(defaults: defaults)
 
-        store.add(HistoryEntry(expression: "1 + 1", result: 2, stackSnapshot: [2]))
-        store.add(HistoryEntry(expression: "2 + 2", result: 4, stackSnapshot: [4]))
+        store.add(HistoryEntry(mode: .standard, expression: "1 + 1", result: 2, resultText: "2", stackSnapshot: [2]))
+        store.add(HistoryEntry(mode: .hex, expression: "2 + 2", result: 4, resultText: "4", stackSnapshot: [4]))
 
         XCTAssertEqual(store.entries.map(\.expression), ["2 + 2", "1 + 1"])
+        XCTAssertEqual(store.entries.first?.mode, .hex)
     }
 
     func testMaxEntriesIsEnforced() {
         let defaults = makeDefaults()
         let store = makeStore(defaults: defaults, maxEntries: 2)
 
-        store.add(HistoryEntry(expression: "1", result: 1, stackSnapshot: [1]))
-        store.add(HistoryEntry(expression: "2", result: 2, stackSnapshot: [2]))
-        store.add(HistoryEntry(expression: "3", result: 3, stackSnapshot: [3]))
+        store.add(HistoryEntry(mode: .standard, expression: "1", result: 1, resultText: "1", stackSnapshot: [1]))
+        store.add(HistoryEntry(mode: .hex, expression: "2", result: 2, resultText: "2", stackSnapshot: [2]))
+        store.add(HistoryEntry(mode: .binary, expression: "3", result: 3, resultText: "3", stackSnapshot: [3]))
 
         XCTAssertEqual(store.entries.count, 2)
         XCTAssertEqual(store.entries.map(\.expression), ["3", "2"])
@@ -311,13 +353,15 @@ final class HistoryStoreTests: XCTestCase {
         let key = uniqueKey()
 
         let store = HistoryStore(userDefaults: defaults, storageKey: key, maxEntries: 5)
-        store.add(HistoryEntry(expression: "1 + 1", result: 2, stackSnapshot: [2]))
+        store.add(HistoryEntry(mode: .hex, expression: "1 + 1", result: 2, resultText: "2", stackSnapshot: [2]))
 
         let reloaded = HistoryStore(userDefaults: defaults, storageKey: key, maxEntries: 5)
 
         XCTAssertEqual(reloaded.entries.count, 1)
         XCTAssertEqual(reloaded.entries.first?.expression, "1 + 1")
         XCTAssertEqual(reloaded.entries.first?.result, 2)
+        XCTAssertEqual(reloaded.entries.first?.displayResultText, "2")
+        XCTAssertEqual(reloaded.entries.first?.mode, .hex)
     }
 
     func testClearRemovesInMemoryAndPersistedData() {
@@ -325,7 +369,7 @@ final class HistoryStoreTests: XCTestCase {
         let key = uniqueKey()
 
         let store = HistoryStore(userDefaults: defaults, storageKey: key, maxEntries: 5)
-        store.add(HistoryEntry(expression: "1", result: 1, stackSnapshot: [1]))
+        store.add(HistoryEntry(mode: .standard, expression: "1", result: 1, resultText: "1", stackSnapshot: [1]))
         store.clear()
 
         XCTAssertEqual(store.entries.count, 0)
@@ -351,23 +395,77 @@ final class HistoryStoreTests: XCTestCase {
     }
 }
 
+final class AppSessionStoreTests: XCTestCase {
+    func testSessionPersistsAndReloads() {
+        let defaults = makeDefaults()
+        let store = AppSessionStore(
+            userDefaults: defaults,
+            sessionKey: "session-\(UUID().uuidString)",
+            historyFilterKey: "filter-\(UUID().uuidString)"
+        )
+
+        let session = CalculatorSession(
+            mode: .hex,
+            stack: [10, 15],
+            inputBuffer: "A",
+            isTyping: true
+        )
+        store.saveSession(session)
+
+        XCTAssertEqual(store.loadSession(), session)
+    }
+
+    func testHistoryFilterPersistsAndReloads() {
+        let defaults = makeDefaults()
+        let store = AppSessionStore(
+            userDefaults: defaults,
+            sessionKey: "session-\(UUID().uuidString)",
+            historyFilterKey: "filter-\(UUID().uuidString)"
+        )
+
+        store.saveHistoryFilter(.binary)
+
+        XCTAssertEqual(store.loadHistoryFilter(), .binary)
+    }
+
+    private func makeDefaults() -> UserDefaults {
+        let suiteName = "ModernRPNTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)
+        XCTAssertNotNil(defaults)
+        return defaults!
+    }
+}
+
 @MainActor
 final class CalculatorViewModelTests: XCTestCase {
     func testInitialState() {
         let viewModel = makeViewModel()
 
-        XCTAssertEqual(viewModel.mode, .basic)
+        XCTAssertEqual(viewModel.mode, .standard)
         XCTAssertEqual(viewModel.displayText, "0")
         XCTAssertEqual(viewModel.stackLines, ["T:", "Z:", "Y:", "X:"])
         XCTAssertNil(viewModel.errorMessage)
+        XCTAssertEqual(viewModel.historyFilter, .all)
     }
 
     func testModeCanBeChanged() {
         let viewModel = makeViewModel()
 
-        viewModel.setMode(.scientific)
+        viewModel.setMode(.hex)
 
-        XCTAssertEqual(viewModel.mode, .scientific)
+        XCTAssertEqual(viewModel.mode, .hex)
+    }
+
+    func testModeSwitchUpdatesFormatting() {
+        let viewModel = makeViewModel()
+
+        viewModel.tapDigit("1")
+        viewModel.tapDigit("5")
+        viewModel.enter()
+        viewModel.setMode(.hex)
+
+        XCTAssertEqual(viewModel.displayText, "F")
+        XCTAssertEqual(viewModel.stackLines, ["T:", "Z:", "Y:", "X: F"])
     }
 
     func testSuccessfulOperationUpdatesDisplayStackAndHistory() {
@@ -426,6 +524,58 @@ final class CalculatorViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.displayText, "1")
     }
 
+    func testHexModeOperationUsesHexHistoryFormatting() {
+        let viewModel = makeViewModel()
+        viewModel.setMode(.hex)
+
+        viewModel.tapDigit("A")
+        viewModel.enter()
+        viewModel.tapDigit("5")
+        viewModel.enter()
+        viewModel.perform(.add)
+
+        XCTAssertEqual(viewModel.displayText, "F")
+        XCTAssertEqual(viewModel.historyStore.entries.first?.expression, "A + 5")
+        XCTAssertEqual(viewModel.historyStore.entries.first?.displayResultText, "F")
+        XCTAssertEqual(viewModel.historyStore.entries.first?.mode, .hex)
+    }
+
+    func testHistoryFilterCanBeChanged() {
+        let viewModel = makeViewModel()
+
+        viewModel.setHistoryFilter(.hex)
+
+        XCTAssertEqual(viewModel.historyFilter, .hex)
+    }
+
+    func testViewModelRestoresPersistedSessionAndFilter() {
+        let suiteName = "ModernRPNTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)
+        XCTAssertNotNil(defaults)
+
+        let historyStore = HistoryStore(
+            userDefaults: defaults!,
+            storageKey: "history-\(UUID().uuidString)",
+            maxEntries: 25
+        )
+        let sessionStore = AppSessionStore(
+            userDefaults: defaults!,
+            sessionKey: "session-\(UUID().uuidString)",
+            historyFilterKey: "filter-\(UUID().uuidString)"
+        )
+
+        sessionStore.saveSession(
+            CalculatorSession(mode: .hex, stack: [15], inputBuffer: "A", isTyping: true)
+        )
+        sessionStore.saveHistoryFilter(.hex)
+
+        let viewModel = CalculatorViewModel(historyStore: historyStore, sessionStore: sessionStore)
+
+        XCTAssertEqual(viewModel.mode, .hex)
+        XCTAssertEqual(viewModel.displayText, "A")
+        XCTAssertEqual(viewModel.historyFilter, .hex)
+    }
+
     private func makeViewModel() -> CalculatorViewModel {
         let suiteName = "ModernRPNTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)
@@ -437,6 +587,12 @@ final class CalculatorViewModelTests: XCTestCase {
             maxEntries: 25
         )
 
-        return CalculatorViewModel(historyStore: store)
+        let sessionStore = AppSessionStore(
+            userDefaults: defaults!,
+            sessionKey: "session-\(UUID().uuidString)",
+            historyFilterKey: "filter-\(UUID().uuidString)"
+        )
+
+        return CalculatorViewModel(historyStore: store, sessionStore: sessionStore)
     }
 }
