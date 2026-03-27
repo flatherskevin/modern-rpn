@@ -27,6 +27,7 @@ and this project aims to follow [Semantic Versioning](https://semver.org/spec/v2
 - Changed history filter presentation to use a controlled custom menu so option order remains stable as `All`, `Standard`, `Binary`, `Hex`.
 - Changed history badges, filter controls, and mode chips to use consistent mode color themes: neutral for `Standard`, green for `Binary`, and blue for `Hex`.
 - Changed text and control styling in the history UI to improve readability and contrast on dark backgrounds.
+- Changed the shared project version settings to prepare the `1.1.0` App Store build as build `2`.
 
 ### Fixed
 - Fixed vertical spacing issues that left the calculator feeling short on taller devices.
