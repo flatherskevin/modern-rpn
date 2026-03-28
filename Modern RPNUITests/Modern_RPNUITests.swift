@@ -63,6 +63,13 @@ final class Modern_RPNUITests: XCTestCase {
         XCTAssertTrue(app.buttons["0"].exists)
         XCTAssertFalse(app.buttons["A"].exists)
         XCTAssertFalse(app.buttons["."].exists)
+
+        app.buttons["mode-picker"].tap()
+        app.buttons["Financial"].tap()
+
+        XCTAssertTrue(app.buttons["PV"].exists)
+        XCTAssertTrue(app.buttons["PMT"].exists)
+        XCTAssertTrue(app.buttons["FV"].exists)
     }
 
     @MainActor

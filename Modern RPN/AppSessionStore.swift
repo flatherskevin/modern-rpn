@@ -5,6 +5,7 @@ enum HistoryModeFilter: String, CaseIterable, Codable, Identifiable {
     case standard
     case binary
     case hex
+    case financial
 
     var id: String { rawValue }
 
@@ -18,6 +19,8 @@ enum HistoryModeFilter: String, CaseIterable, Codable, Identifiable {
             return "Hex"
         case .binary:
             return "Binary"
+        case .financial:
+            return "Financial"
         }
     }
 
@@ -31,6 +34,21 @@ enum HistoryModeFilter: String, CaseIterable, Codable, Identifiable {
             return .hex
         case .binary:
             return .binary
+        case .financial:
+            return .financial
+        }
+    }
+
+    init?(mode: CalculatorMode) {
+        switch mode {
+        case .standard:
+            self = .standard
+        case .binary:
+            self = .binary
+        case .hex:
+            self = .hex
+        case .financial:
+            self = .financial
         }
     }
 }
@@ -40,6 +58,38 @@ struct CalculatorSession: Codable, Equatable {
     let stack: [Double]
     let inputBuffer: String
     let isTyping: Bool
+    let financialRegisters: FinancialRegisters
+
+    init(
+        mode: CalculatorMode,
+        stack: [Double],
+        inputBuffer: String,
+        isTyping: Bool,
+        financialRegisters: FinancialRegisters = FinancialRegisters()
+    ) {
+        self.mode = mode
+        self.stack = stack
+        self.inputBuffer = inputBuffer
+        self.isTyping = isTyping
+        self.financialRegisters = financialRegisters
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case mode
+        case stack
+        case inputBuffer
+        case isTyping
+        case financialRegisters
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        mode = try container.decode(CalculatorMode.self, forKey: .mode)
+        stack = try container.decode([Double].self, forKey: .stack)
+        inputBuffer = try container.decode(String.self, forKey: .inputBuffer)
+        isTyping = try container.decode(Bool.self, forKey: .isTyping)
+        financialRegisters = try container.decodeIfPresent(FinancialRegisters.self, forKey: .financialRegisters) ?? FinancialRegisters()
+    }
 }
 
 final class AppSessionStore {
