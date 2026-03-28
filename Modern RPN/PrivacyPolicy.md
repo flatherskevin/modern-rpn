@@ -13,10 +13,11 @@ The App does not collect personal information through developer-operated servers
 To provide the in-app History feature, the app stores limited information locally on your device.
 
 - Calculation history, including expressions, results, timestamps, and stack snapshots.
+- Calculator session state, including the selected mode, stack, current input, and financial worksheet state such as TVM registers, payment mode, memory registers, and cash flow entries.
 
 ## How Information Is Used
 
-Locally stored calculation history is used only to show your history inside the App.
+Locally stored history and calculator state are used only to restore your calculator and show history inside the App.
 
 - No advertising use
 - No marketing use
@@ -29,7 +30,7 @@ The App does not sell, rent, share, or otherwise disclose your data to the devel
 
 ## Retention and Deletion
 
-Your calculation history remains on your device until you delete it.
+Your calculation history and calculator session state remain on your device until you delete them.
 
 You can clear stored history at any time from the History screen. Removing the app also removes the app's local data, subject to how your device and backups are managed by Apple.
 
