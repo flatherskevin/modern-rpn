@@ -2,6 +2,26 @@ import XCTest
 @testable import Modern_RPN
 
 final class RPNCalculatorTests: XCTestCase {
+    func testCompactHexLayoutShrinksButtonsForSEHeight() {
+        let metrics = CalculatorLayoutMetrics.make(screenSize: CGSize(width: 375, height: 667), safeAreaBottom: 0, rowCount: 7)
+
+        XCTAssertEqual(metrics.buttonHeight, 46)
+        XCTAssertEqual(metrics.buttonSpacing, 4)
+        XCTAssertEqual(metrics.displayFontSize, 56)
+        XCTAssertTrue(metrics.prefersScrollFallback)
+    }
+
+    func testStandardSELayoutFitsWithoutScrollFallback() {
+        let standardMetrics = CalculatorLayoutMetrics.make(screenSize: CGSize(width: 375, height: 667), safeAreaBottom: 0, rowCount: 6)
+        let hexMetrics = CalculatorLayoutMetrics.make(screenSize: CGSize(width: 375, height: 667), safeAreaBottom: 0, rowCount: 7)
+
+        XCTAssertFalse(standardMetrics.prefersScrollFallback)
+        XCTAssertTrue(hexMetrics.prefersScrollFallback)
+        XCTAssertEqual(standardMetrics.buttonHeight, 50)
+        XCTAssertEqual(standardMetrics.displayFontSize, 64)
+        XCTAssertEqual(hexMetrics.buttonHeight, 46)
+    }
+
     func testInitialState() {
         let calculator = RPNCalculator()
 
@@ -22,6 +42,18 @@ final class RPNCalculatorTests: XCTestCase {
         XCTAssertTrue(calculator.isTyping)
         XCTAssertEqual(calculator.inputBuffer, "52")
         XCTAssertEqual(calculator.displayText, "52")
+    }
+
+    func testStandardModeTypingShowsGroupedDigits() {
+        let calculator = RPNCalculator()
+
+        calculator.tapDigit("1")
+        calculator.tapDigit("2")
+        calculator.tapDigit("3")
+        calculator.tapDigit("4")
+
+        XCTAssertEqual(calculator.inputBuffer, "1234")
+        XCTAssertEqual(calculator.displayText, "1,234")
     }
 
     func testTapDigitIgnoresInvalidInput() {
@@ -287,6 +319,8 @@ final class RPNCalculatorTests: XCTestCase {
         XCTAssertEqual(RPNCalculator.format(-.infinity), "-∞")
         XCTAssertEqual(RPNCalculator.format(5.0), "5")
         XCTAssertEqual(RPNCalculator.format(1.25), "1.25")
+        XCTAssertEqual(RPNCalculator.format(1234.0), "1,234")
+        XCTAssertEqual(RPNCalculator.format(12345.67), "12,345.67")
         XCTAssertEqual(RPNCalculator.format(.nan), "NaN")
     }
 
@@ -308,6 +342,8 @@ final class RPNCalculatorTests: XCTestCase {
                 calculator.toggleSign()
             case ".":
                 calculator.tapDecimal()
+            case ",":
+                continue
             default:
                 calculator.tapDigit(String(char))
             }
@@ -318,6 +354,19 @@ final class RPNCalculatorTests: XCTestCase {
 
 @MainActor
 final class HistoryStoreTests: XCTestCase {
+    func testHistoryEntryDisplaysGroupedStandardValues() {
+        let entry = HistoryEntry(
+            mode: .standard,
+            expression: "1234 + 5678",
+            result: 6912,
+            resultText: "6912",
+            stackSnapshot: [6912]
+        )
+
+        XCTAssertEqual(entry.displayExpression, "1,234 + 5,678")
+        XCTAssertEqual(entry.displayResultText, "6,912")
+    }
+
     func testInitialStoreIsEmpty() {
         let defaults = makeDefaults()
         let store = makeStore(defaults: defaults)

@@ -34,7 +34,7 @@ final class RPNCalculator {
 
     var displayText: String {
         if isTyping {
-            return inputBuffer
+            return mode.formatInput(inputBuffer)
         }
         guard let top = stack.last else { return "0" }
         return mode.format(top)

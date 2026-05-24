@@ -42,7 +42,7 @@ struct CalculatorSession: Codable, Equatable {
     let isTyping: Bool
 }
 
-final class AppSessionStore {
+struct AppSessionStore {
     private let userDefaults: UserDefaults
     private let sessionKey: String
     private let historyFilterKey: String
