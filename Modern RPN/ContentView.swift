@@ -115,34 +115,20 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let topPadding: CGFloat = 12
-            let bottomPadding = max(8, geometry.safeAreaInsets.bottom + 4)
-            let buttonHeight = keypadButtonHeight(
-                screenHeight: geometry.size.height,
-                topPadding: topPadding,
-                bottomPadding: bottomPadding
+            let metrics = CalculatorLayoutMetrics.make(
+                screenSize: geometry.size,
+                safeAreaBottom: geometry.safeAreaInsets.bottom,
+                rowCount: buttonRows().count
             )
 
             ZStack {
                 CalculatorColor.background
                     .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    header
-                    stackPanel
-                        .padding(.top, 12)
-
-                    display
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                        .padding(.top, 12)
-                        .padding(.bottom, 12)
-
-                    buttonGrid(buttonHeight: buttonHeight)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.horizontal, 16)
-                .padding(.top, topPadding)
-                .padding(.bottom, bottomPadding)
+                calculatorBody(metrics: metrics)
+                    .padding(.horizontal, metrics.horizontalPadding)
+                    .padding(.top, metrics.topPadding)
+                    .padding(.bottom, metrics.bottomPadding)
             }
         }
         .sheet(isPresented: $showingHistory) {
@@ -159,7 +145,18 @@ struct ContentView: View {
         }
     }
 
-    private var header: some View {
+    private func calculatorBody(metrics: CalculatorLayoutMetrics) -> some View {
+        VStack(spacing: metrics.contentSpacing) {
+            header(metrics: metrics)
+            stackPanel(metrics: metrics)
+            display(metrics: metrics)
+            buttonGrid(metrics: metrics)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func header(metrics: CalculatorLayoutMetrics) -> some View {
         HStack {
             Menu {
                 Button("History") {
@@ -173,7 +170,7 @@ struct ContentView: View {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(CalculatorColor.displayText)
-                    .frame(width: 44, height: 44)
+                    .frame(width: metrics.headerButtonSize, height: metrics.headerButtonSize)
             }
             .accessibilityLabel("Menu")
             .accessibilityIdentifier("menu-button")
@@ -194,14 +191,14 @@ struct ContentView: View {
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .tracking(0.1)
                     .lineLimit(1)
-                .foregroundStyle(theme.accentText)
-                .padding(.horizontal, 16)
-                .frame(minWidth: 112, minHeight: 36)
-                .background(theme.accentBackground, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .stroke(theme.accentBorder, lineWidth: 1)
-                }
+                    .foregroundStyle(theme.accentText)
+                    .padding(.horizontal, 16)
+                    .frame(minWidth: metrics.modeBadgeMinWidth, minHeight: metrics.modeBadgeMinHeight)
+                    .background(theme.accentBackground, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(theme.accentBorder, lineWidth: 1)
+                    }
             }
             .accessibilityLabel("Mode")
             .accessibilityIdentifier("mode-picker")
@@ -209,77 +206,93 @@ struct ContentView: View {
             Spacer()
 
             Color.clear
-                .frame(width: 44, height: 44)
+                .frame(width: metrics.headerButtonSize, height: metrics.headerButtonSize)
         }
     }
 
-    private var stackPanel: some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func stackPanel(metrics: CalculatorLayoutMetrics) -> some View {
+        VStack(alignment: .leading, spacing: metrics.stackSpacing) {
             ForEach(viewModel.stackLines, id: \.self) { line in
                 Text(line)
-                    .font(.system(size: 15, weight: .medium, design: .monospaced))
+                    .font(.system(size: metrics.stackFontSize, weight: .medium, design: .monospaced))
                     .foregroundStyle(CalculatorColor.stackText)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(10)
+        .padding(metrics.stackPanelPadding)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private var display: some View {
+    private func display(metrics: CalculatorLayoutMetrics) -> some View {
         VStack(alignment: .trailing, spacing: 4) {
             Text(viewModel.errorMessage ?? "")
-                .font(.system(size: 14, weight: .regular, design: .rounded))
+                .font(.system(size: metrics.displayErrorFontSize, weight: .regular, design: .rounded))
                 .foregroundStyle(.red.opacity(0.9))
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .lineLimit(1)
-                .frame(height: 16)
+                .frame(height: metrics.displayErrorHeight)
 
             Text(viewModel.displayText)
-                .font(.system(size: 96, weight: .light, design: .rounded))
+                .font(.system(size: metrics.displayFontSize, weight: .light, design: .rounded))
                 .foregroundStyle(CalculatorColor.displayText)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .lineLimit(1)
                 .minimumScaleFactor(0.35)
-                .frame(minHeight: 88, alignment: .bottomTrailing)
+                .frame(minHeight: metrics.displayMinHeight, alignment: .bottomTrailing)
                 .accessibilityIdentifier("display-value")
         }
         .padding(.horizontal, 6)
+        .layoutPriority(1)
     }
 
-    private func buttonGrid(buttonHeight: CGFloat) -> some View {
-        Grid(horizontalSpacing: 6, verticalSpacing: 6) {
-            ForEach(Array(buttonRows().enumerated()), id: \.offset) { _, row in
-                GridRow {
-                    ForEach(Array(row.enumerated()), id: \.offset) { _, button in
-                        if let button {
-                            Button(action: button.action) {
-                                buttonLabelView(for: button)
+    private func buttonGrid(metrics: CalculatorLayoutMetrics) -> some View {
+        GeometryReader { proxy in
+            let rowCount = buttonRows().count
+            let buttonHeight = fittedButtonHeight(
+                availableHeight: proxy.size.height,
+                preferredHeight: metrics.buttonHeight,
+                rowCount: rowCount,
+                spacing: metrics.buttonSpacing
+            )
+
+            VStack {
+                Spacer(minLength: 0)
+
+                Grid(horizontalSpacing: metrics.buttonSpacing, verticalSpacing: metrics.buttonSpacing) {
+                    ForEach(Array(buttonRows().enumerated()), id: \.offset) { _, row in
+                        GridRow {
+                            ForEach(Array(row.enumerated()), id: \.offset) { _, button in
+                                if let button {
+                                    Button(action: button.action) {
+                                        buttonLabelView(for: button, metrics: metrics)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .accessibilityLabel(button.label)
+                                    .buttonStyle(CalculatorPressStyle(color: button.kind.fillColor, span: button.span, height: buttonHeight))
+                                    .gridCellColumns(button.span)
+                                } else {
+                                    Color.clear
+                                        .frame(height: buttonHeight)
+                                }
                             }
-                            .frame(maxWidth: .infinity)
-                            .accessibilityLabel(button.label)
-                            .buttonStyle(CalculatorPressStyle(color: button.kind.fillColor, span: button.span, height: buttonHeight))
-                            .gridCellColumns(button.span)
-                        } else {
-                            Color.clear
-                                .frame(height: buttonHeight)
                         }
                     }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
     }
 
     @ViewBuilder
-    private func buttonLabelView(for button: CalculatorButtonDefinition) -> some View {
+    private func buttonLabelView(for button: CalculatorButtonDefinition, metrics: CalculatorLayoutMetrics) -> some View {
         if let symbolName = operatorSymbolName(button.label) {
             Image(systemName: symbolName)
-                .font(.system(size: buttonFontSize(button.label), weight: .semibold))
+                .font(.system(size: buttonFontSize(button.label, metrics: metrics), weight: .semibold))
                 .foregroundStyle(button.kind.textColor)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
             Text(button.label)
-                .font(.system(size: buttonFontSize(button.label), weight: .medium, design: .rounded))
+                .font(.system(size: buttonFontSize(button.label, metrics: metrics), weight: .medium, design: .rounded))
                 .minimumScaleFactor(0.45)
                 .lineLimit(1)
                 .multilineTextAlignment(.center)
@@ -363,10 +376,10 @@ struct ContentView: View {
         }
     }
 
-    private func buttonFontSize(_ label: String) -> CGFloat {
-        if ["÷", "×", "−", "+"].contains(label) { return 44 }
-        if label == "ENTER" { return 28 }
-        return 34
+    private func buttonFontSize(_ label: String, metrics: CalculatorLayoutMetrics) -> CGFloat {
+        if ["÷", "×", "−", "+"].contains(label) { return metrics.operatorFontSize }
+        if label == "ENTER" { return metrics.enterFontSize }
+        return metrics.buttonFontSize
     }
 
     private func operatorSymbolName(_ label: String) -> String? {
@@ -384,17 +397,15 @@ struct ContentView: View {
         }
     }
 
-    private func keypadButtonHeight(
-        screenHeight: CGFloat,
-        topPadding: CGFloat,
-        bottomPadding: CGFloat
+    private func fittedButtonHeight(
+        availableHeight: CGFloat,
+        preferredHeight: CGFloat,
+        rowCount: Int,
+        spacing: CGFloat
     ) -> CGFloat {
-        let rowCount = CGFloat(buttonRows().count)
-        let reservedHeight = topPadding + bottomPadding + 44 + 84 + 120 + 24
-        let availableHeight = screenHeight - reservedHeight - (max(0, rowCount - 1) * 6)
-        let fittedHeight = floor(availableHeight / rowCount)
-
-        return min(76, max(56, fittedHeight))
+        let totalSpacing = spacing * CGFloat(max(0, rowCount - 1))
+        let fittedHeight = floor((availableHeight - totalSpacing) / CGFloat(rowCount))
+        return max(36, min(preferredHeight, fittedHeight))
     }
 }
 
@@ -445,7 +456,7 @@ private struct HistoryView: View {
                         ForEach(entries) { entry in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(alignment: .firstTextBaseline) {
-                                    Text(entry.expression)
+                                    Text(entry.displayExpression)
                                         .font(.system(size: 16, weight: .semibold, design: .monospaced))
                                         .foregroundStyle(CalculatorColor.displayText)
 

@@ -49,8 +49,21 @@ struct HistoryEntry: Codable, Identifiable {
         stackSnapshot = try container.decode([Double].self, forKey: .stackSnapshot)
     }
 
+    var displayExpression: String {
+        guard mode == .standard else { return expression }
+
+        let parts = expression.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 3,
+              let lhs = mode.parse(parts[0]),
+              let rhs = mode.parse(parts[2]) else {
+            return expression
+        }
+
+        return "\(mode.format(lhs)) \(parts[1]) \(mode.format(rhs))"
+    }
+
     var displayResultText: String {
-        resultText ?? RPNCalculator.format(result)
+        mode.format(result)
     }
 
     var modeTitle: String {
