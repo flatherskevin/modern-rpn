@@ -54,18 +54,40 @@ final class RPNCalculator {
     }
 
     func setMode(_ mode: CalculatorMode) {
+        // Mode switches are blocked if the current visible value would violate the target mode's width rules.
+        if isTyping,
+           let value = self.mode.parse(inputBuffer),
+           !mode.canRepresent(value) {
+            errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
+            return
+        }
+
+        guard stack.allSatisfy(mode.canRepresent) else {
+            errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
+            return
+        }
+
         if isTyping, let value = self.mode.parse(inputBuffer) {
             inputBuffer = mode.format(value)
         }
 
         self.mode = mode
+        errorMessage = nil
     }
 
     func restore(session: CalculatorSession) {
         mode = session.mode
-        stack = session.stack
-        inputBuffer = session.inputBuffer
-        isTyping = session.isTyping
+        // Drop stale oversized values on restore so old sessions cannot reintroduce ellipsis regressions.
+        stack = session.stack.filter(mode.canRepresent)
+        if session.isTyping,
+           let value = mode.parse(session.inputBuffer),
+           mode.canRepresent(value) {
+            inputBuffer = session.inputBuffer
+            isTyping = true
+        } else {
+            inputBuffer = "0"
+            isTyping = false
+        }
         errorMessage = nil
     }
 
@@ -84,7 +106,6 @@ final class RPNCalculator {
 
         if isTyping {
             if !mode.canAppend(to: inputBuffer) {
-                inputBuffer = normalizedDigit
                 return
             }
 
@@ -138,6 +159,11 @@ final class RPNCalculator {
         if isTyping {
             guard let value = mode.parse(inputBuffer) else {
                 errorMessage = "Invalid number"
+                return nil
+            }
+            // The model enforces the same single-line representability rules as the view.
+            guard mode.canRepresent(value) else {
+                errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
                 return nil
             }
             stack.append(value)
@@ -213,6 +239,14 @@ final class RPNCalculator {
             stack.append(lhs)
             stack.append(rhs)
             errorMessage = "Cannot divide by zero"
+            return nil
+        }
+
+        // Reject oversized radix results before mutating the stack to keep display/layout assumptions valid.
+        guard mode.canRepresent(result) else {
+            stack.append(lhs)
+            stack.append(rhs)
+            errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
             return nil
         }
 

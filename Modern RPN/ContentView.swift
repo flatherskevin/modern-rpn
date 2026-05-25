@@ -74,37 +74,100 @@ private struct CalculatorPressStyle: ButtonStyle {
     let height: CGFloat
 
     func makeBody(configuration: Configuration) -> some View {
+        let cornerRadius = min(height * 0.24, 16)
+
         configuration.label
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .frame(height: height)
             .background {
-                Group {
-                    if span == 1 {
-                        RoundedRectangle(cornerRadius: 24, style: .continuous).fill(color)
-                    } else {
-                        RoundedRectangle(cornerRadius: 30, style: .continuous).fill(color)
-                    }
-                }
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(color)
                 .overlay {
                     if configuration.isPressed {
-                        Group {
-                            if span == 1 {
-                                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                    .fill(Color.white.opacity(0.2))
-                            } else {
-                                RoundedRectangle(cornerRadius: 30, style: .continuous)
-                                    .fill(Color.white.opacity(0.2))
-                            }
-                        }
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.2))
                     }
                 }
             }
             .scaleEffect(configuration.isPressed ? pressedScale : 1.0)
+            .zIndex(configuration.isPressed ? 1 : 0)
             .animation(.spring(response: 0.16, dampingFraction: 0.72), value: configuration.isPressed)
     }
 
     private var pressedScale: CGFloat {
-        span > 1 ? 1.06 : 1.2
+        span > 1 ? 1.02 : 1.04
+    }
+}
+
+private struct HistoryLayoutMetrics {
+    let horizontalPadding: CGFloat
+    let topPadding: CGFloat
+    let bottomPadding: CGFloat
+    let filterBarHeight: CGFloat
+    let filterBarHorizontalPadding: CGFloat
+    let filterMenuTopSpacing: CGFloat
+    let filterMenuWidth: CGFloat
+    let filterMenuRowHeight: CGFloat
+    let filterMenuRowPadding: CGFloat
+    let filterMenuContainerPadding: CGFloat
+    let filterMenuCornerRadius: CGFloat
+    let toolbarButtonHeight: CGFloat
+    let toolbarButtonHorizontalPadding: CGFloat
+    let entryVerticalPadding: CGFloat
+
+    static func make(screenSize: CGSize) -> HistoryLayoutMetrics {
+        let compactWidth = screenSize.width <= 350
+        let compactHeight = screenSize.height <= 700
+        let compactLayout = compactWidth || compactHeight
+        let horizontalPadding: CGFloat = compactWidth ? 14 : 20
+        let filterMenuWidth = min(max(screenSize.width - (horizontalPadding * 2), 180), compactWidth ? 200 : 240)
+
+        return HistoryLayoutMetrics(
+            horizontalPadding: horizontalPadding,
+            topPadding: compactHeight ? 6 : 8,
+            bottomPadding: compactHeight ? 10 : 12,
+            filterBarHeight: compactLayout ? 36 : 38,
+            filterBarHorizontalPadding: compactLayout ? 12 : 14,
+            filterMenuTopSpacing: compactLayout ? 6 : 8,
+            filterMenuWidth: filterMenuWidth,
+            filterMenuRowHeight: compactLayout ? 40 : 42,
+            filterMenuRowPadding: compactLayout ? 12 : 14,
+            filterMenuContainerPadding: compactLayout ? 6 : 8,
+            filterMenuCornerRadius: compactLayout ? 20 : 22,
+            toolbarButtonHeight: compactLayout ? 40 : 44,
+            toolbarButtonHorizontalPadding: compactLayout ? 14 : 18,
+            entryVerticalPadding: compactLayout ? 3 : 4
+        )
+    }
+}
+
+private struct PrivacyPolicyLayoutMetrics {
+    let contentPadding: CGFloat
+    let sectionSpacing: CGFloat
+    let cardPadding: CGFloat
+    let cardCornerRadius: CGFloat
+    let cardInnerSpacing: CGFloat
+    let bulletSpacing: CGFloat
+    let prefaceFontSize: CGFloat
+    let sectionTitleFontSize: CGFloat
+    let bodyFontSize: CGFloat
+
+    static func make(screenSize: CGSize) -> PrivacyPolicyLayoutMetrics {
+        let compactWidth = screenSize.width <= 350
+        let compactHeight = screenSize.height <= 700
+        let compactLayout = compactWidth || compactHeight
+
+        return PrivacyPolicyLayoutMetrics(
+            contentPadding: compactWidth ? 12 : 16,
+            sectionSpacing: compactLayout ? 16 : 20,
+            cardPadding: compactWidth ? 14 : 16,
+            cardCornerRadius: compactWidth ? 16 : 18,
+            cardInnerSpacing: compactLayout ? 8 : 10,
+            bulletSpacing: compactLayout ? 6 : 8,
+            prefaceFontSize: compactLayout ? 15 : 16,
+            sectionTitleFontSize: compactLayout ? 17 : 18,
+            bodyFontSize: compactLayout ? 14 : 15
+        )
     }
 }
 
@@ -148,10 +211,12 @@ struct ContentView: View {
     private func calculatorBody(metrics: CalculatorLayoutMetrics) -> some View {
         VStack(spacing: metrics.contentSpacing) {
             header(metrics: metrics)
+                .frame(height: metrics.headerHeight)
             stackPanel(metrics: metrics)
             display(metrics: metrics)
+                .frame(height: metrics.displayAreaHeight, alignment: .bottom)
             buttonGrid(metrics: metrics)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                .frame(height: metrics.buttonGridHeight, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -211,20 +276,33 @@ struct ContentView: View {
     }
 
     private func stackPanel(metrics: CalculatorLayoutMetrics) -> some View {
-        VStack(alignment: .leading, spacing: metrics.stackSpacing) {
-            ForEach(viewModel.stackLines, id: \.self) { line in
-                Text(line)
-                    .font(.system(size: metrics.stackFontSize, weight: .medium, design: .monospaced))
-                    .foregroundStyle(CalculatorColor.stackText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        GeometryReader { proxy in
+            let contentHeight = max(0, proxy.size.height - (metrics.stackPanelPadding * 2))
+            let rowHeight = max(
+                metrics.stackFontSize * 1.3,
+                (contentHeight - (metrics.stackSpacing * 3)) / 4
+            )
+
+            VStack(alignment: .leading, spacing: metrics.stackSpacing) {
+                ForEach(viewModel.stackLines, id: \.self) { line in
+                    Text(line)
+                        .font(.system(size: metrics.stackFontSize, weight: .medium, design: .monospaced))
+                        .foregroundStyle(CalculatorColor.stackText)
+                        .frame(maxWidth: .infinity, minHeight: rowHeight, maxHeight: rowHeight, alignment: .topLeading)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(metrics.stackPanelPadding)
         }
-        .padding(metrics.stackPanelPadding)
+        .frame(maxWidth: .infinity)
+        .frame(height: metrics.stackPanelHeight, alignment: .topLeading)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func display(metrics: CalculatorLayoutMetrics) -> some View {
-        VStack(alignment: .trailing, spacing: 4) {
+        let minimumScaleFactor = viewModel.mode == .binary ? 0.55 : 0.35
+
+        return VStack(alignment: .trailing, spacing: 4) {
             Text(viewModel.errorMessage ?? "")
                 .font(.system(size: metrics.displayErrorFontSize, weight: .regular, design: .rounded))
                 .foregroundStyle(.red.opacity(0.9))
@@ -237,7 +315,7 @@ struct ContentView: View {
                 .foregroundStyle(CalculatorColor.displayText)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .lineLimit(1)
-                .minimumScaleFactor(0.35)
+                .minimumScaleFactor(minimumScaleFactor)
                 .frame(minHeight: metrics.displayMinHeight, alignment: .bottomTrailing)
                 .accessibilityIdentifier("display-value")
         }
@@ -246,40 +324,25 @@ struct ContentView: View {
     }
 
     private func buttonGrid(metrics: CalculatorLayoutMetrics) -> some View {
-        GeometryReader { proxy in
-            let rowCount = buttonRows().count
-            let buttonHeight = fittedButtonHeight(
-                availableHeight: proxy.size.height,
-                preferredHeight: metrics.buttonHeight,
-                rowCount: rowCount,
-                spacing: metrics.buttonSpacing
-            )
-
-            VStack {
-                Spacer(minLength: 0)
-
-                Grid(horizontalSpacing: metrics.buttonSpacing, verticalSpacing: metrics.buttonSpacing) {
-                    ForEach(Array(buttonRows().enumerated()), id: \.offset) { _, row in
-                        GridRow {
-                            ForEach(Array(row.enumerated()), id: \.offset) { _, button in
-                                if let button {
-                                    Button(action: button.action) {
-                                        buttonLabelView(for: button, metrics: metrics)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .accessibilityLabel(button.label)
-                                    .buttonStyle(CalculatorPressStyle(color: button.kind.fillColor, span: button.span, height: buttonHeight))
-                                    .gridCellColumns(button.span)
-                                } else {
-                                    Color.clear
-                                        .frame(height: buttonHeight)
-                                }
+        Grid(horizontalSpacing: metrics.buttonSpacing, verticalSpacing: metrics.buttonSpacing) {
+            ForEach(Array(buttonRows().enumerated()), id: \.offset) { _, row in
+                GridRow {
+                    ForEach(Array(row.enumerated()), id: \.offset) { _, button in
+                        if let button {
+                            Button(action: button.action) {
+                                buttonLabelView(for: button, metrics: metrics)
                             }
+                            .frame(maxWidth: .infinity)
+                            .accessibilityLabel(button.label)
+                            .buttonStyle(CalculatorPressStyle(color: button.kind.fillColor, span: button.span, height: metrics.buttonHeight))
+                            .gridCellColumns(button.span)
+                        } else {
+                            Color.clear
+                                .frame(height: metrics.buttonHeight)
                         }
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
     }
 
@@ -396,17 +459,6 @@ struct ContentView: View {
             return nil
         }
     }
-
-    private func fittedButtonHeight(
-        availableHeight: CGFloat,
-        preferredHeight: CGFloat,
-        rowCount: Int,
-        spacing: CGFloat
-    ) -> CGFloat {
-        let totalSpacing = spacing * CGFloat(max(0, rowCount - 1))
-        let fittedHeight = floor((availableHeight - totalSpacing) / CGFloat(rowCount))
-        return max(36, min(preferredHeight, fittedHeight))
-    }
 }
 
 private struct HistoryView: View {
@@ -438,112 +490,116 @@ private struct HistoryView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .topLeading) {
-                VStack(spacing: 0) {
-                    historyFilterBar
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
+        GeometryReader { geometry in
+            let metrics = HistoryLayoutMetrics.make(screenSize: geometry.size)
 
-                    List {
-                        if entries.isEmpty {
-                            Text("No history yet")
-                                .foregroundStyle(.white.opacity(0.75))
-                                .listRowBackground(CalculatorColor.historyBackground)
-                        }
+            NavigationStack {
+                ZStack(alignment: .topLeading) {
+                    VStack(spacing: 0) {
+                        historyFilterBar(metrics: metrics)
+                            .padding(.horizontal, metrics.horizontalPadding)
+                            .padding(.top, metrics.topPadding)
+                            .padding(.bottom, metrics.bottomPadding)
+                            .overlay(alignment: .bottomLeading) {
+                                if showingFilterOptions {
+                                    historyFilterMenu(metrics: metrics)
+                                        .padding(.top, metrics.filterMenuTopSpacing)
+                                }
+                            }
 
-                        ForEach(entries) { entry in
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text(entry.displayExpression)
-                                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                        List {
+                            if entries.isEmpty {
+                                Text("No history yet")
+                                    .foregroundStyle(.white.opacity(0.75))
+                                    .listRowBackground(CalculatorColor.historyBackground)
+                            }
+
+                            ForEach(entries) { entry in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text(entry.displayExpression)
+                                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                                            .foregroundStyle(CalculatorColor.displayText)
+
+                                        Spacer(minLength: 12)
+
+                                        Text(entry.modeTitle)
+                                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(entry.mode.theme.accentText)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(entry.mode.theme.accentBackground, in: Capsule())
+                                            .overlay {
+                                                Capsule()
+                                                    .stroke(entry.mode.theme.accentBorder, lineWidth: 1)
+                                            }
+                                    }
+                                    Text("= \(entry.displayResultText)")
+                                        .font(.system(size: 17, weight: .regular, design: .rounded))
                                         .foregroundStyle(CalculatorColor.displayText)
-
-                                    Spacer(minLength: 12)
-
-                                    Text(entry.modeTitle)
-                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(entry.mode.theme.accentText)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(entry.mode.theme.accentBackground, in: Capsule())
-                                        .overlay {
-                                            Capsule()
-                                                .stroke(entry.mode.theme.accentBorder, lineWidth: 1)
-                                        }
+                                    Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.caption)
+                                        .foregroundStyle(CalculatorColor.historySecondaryText)
                                 }
-                                Text("= \(entry.displayResultText)")
-                                    .font(.system(size: 17, weight: .regular, design: .rounded))
-                                    .foregroundStyle(CalculatorColor.displayText)
-                                Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption)
-                                    .foregroundStyle(CalculatorColor.historySecondaryText)
-                            }
-                            .padding(.vertical, 4)
-                            .listRowBackground(CalculatorColor.historyBackground)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button("Delete", role: .destructive) {
-                                    store.removeEntry(id: entry.id)
+                                .padding(.vertical, metrics.entryVerticalPadding)
+                                .listRowBackground(CalculatorColor.historyBackground)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button("Delete", role: .destructive) {
+                                        store.removeEntry(id: entry.id)
+                                    }
                                 }
                             }
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .background(CalculatorColor.historyBackground)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .background(CalculatorColor.historyBackground)
-                }
 
-                if showingFilterOptions {
-                    Color.black.opacity(0.001)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            showingFilterOptions = false
+                    if showingFilterOptions {
+                        Color.black.opacity(0.001)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                showingFilterOptions = false
+                            }
+                    }
+                }
+                .background(CalculatorColor.historyBackground)
+                .foregroundStyle(.white)
+                .toolbarColorScheme(.dark, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        toolbarButton("Done", disabled: false, metrics: metrics) { dismiss() }
+                    }
+
+                    ToolbarItem(placement: .topBarTrailing) {
+                        toolbarButton("Clear", disabled: entries.isEmpty, metrics: metrics) {
+                            showingClearConfirmation = true
                         }
-
-                    historyFilterMenu
-                        .padding(.leading, 20)
-                        .padding(.top, 58)
-                        .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .topLeading)), removal: .opacity))
-                        .zIndex(1)
-                }
-            }
-            .background(CalculatorColor.historyBackground)
-            .foregroundStyle(.white)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    toolbarButton("Done", disabled: false) { dismiss() }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    toolbarButton("Clear", disabled: entries.isEmpty) {
-                        showingClearConfirmation = true
+                        .disabled(entries.isEmpty)
                     }
-                    .disabled(entries.isEmpty)
                 }
-            }
-            .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.inline)
-            .onChange(of: filter) { _, newValue in
-                onFilterChange(newValue)
-            }
-            .confirmationDialog(
-                clearConfirmationTitle,
-                isPresented: $showingClearConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) {
-                    store.clear(filter: filter)
+                .navigationTitle("History")
+                .navigationBarTitleDisplayMode(.inline)
+                .onChange(of: filter) { _, newValue in
+                    onFilterChange(newValue)
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text(clearConfirmationMessage)
+                .confirmationDialog(
+                    clearConfirmationTitle,
+                    isPresented: $showingClearConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Delete", role: .destructive) {
+                        store.clear(filter: filter)
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text(clearConfirmationMessage)
+                }
             }
         }
     }
 
-    private var historyFilterBar: some View {
+    private func historyFilterBar(metrics: HistoryLayoutMetrics) -> some View {
         HStack {
             Button {
                 withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
@@ -562,8 +618,8 @@ private struct HistoryView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(CalculatorColor.historySecondaryText)
                 }
-                .padding(.horizontal, 14)
-                .frame(height: 38)
+                .padding(.horizontal, metrics.filterBarHorizontalPadding)
+                .frame(height: metrics.filterBarHeight)
                 .background(theme.accentBackground, in: Capsule())
                 .overlay {
                     Capsule()
@@ -576,7 +632,7 @@ private struct HistoryView: View {
         }
     }
 
-    private var historyFilterMenu: some View {
+    private func historyFilterMenu(metrics: HistoryLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(HistoryModeFilter.orderedCases) { option in
                 Button {
@@ -596,8 +652,8 @@ private struct HistoryView: View {
                                 .foregroundStyle(option.theme.accentText)
                         }
                     }
-                    .padding(.horizontal, 14)
-                    .frame(width: 220, height: 42, alignment: .leading)
+                    .padding(.horizontal, metrics.filterMenuRowPadding)
+                    .frame(maxWidth: .infinity, minHeight: metrics.filterMenuRowHeight, alignment: .leading)
                     .background(
                         (option == filter ? option.theme.accentBackground : Color.clear),
                         in: RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -606,19 +662,22 @@ private struct HistoryView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(8)
+        .frame(width: metrics.filterMenuWidth, alignment: .leading)
+        .padding(metrics.filterMenuContainerPadding)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: metrics.filterMenuCornerRadius, style: .continuous)
                 .fill(Color(red: 0.12, green: 0.12, blue: 0.13))
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: metrics.filterMenuCornerRadius, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.22), radius: 18, y: 10)
+        .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .topLeading)), removal: .opacity))
+        .zIndex(1)
     }
 
-    private func toolbarButton(_ title: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+    private func toolbarButton(_ title: String, disabled: Bool, metrics: HistoryLayoutMetrics, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 17, weight: .medium, design: .rounded))
@@ -627,8 +686,8 @@ private struct HistoryView: View {
                     ? CalculatorColor.historyToolbarDisabledText
                     : CalculatorColor.historyToolbarText
                 )
-                .padding(.horizontal, 18)
-                .frame(height: 44)
+                .padding(.horizontal, metrics.toolbarButtonHorizontalPadding)
+                .frame(minHeight: metrics.toolbarButtonHeight)
                 .background(CalculatorColor.historyToolbarBackground, in: Capsule())
         }
         .buttonStyle(.plain)
@@ -641,55 +700,62 @@ private struct PrivacyPolicyView: View {
     private let document = PrivacyPolicyDocument.load()
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    ForEach(document.preface, id: \.self) { paragraph in
-                        Text(paragraph)
-                            .font(.system(size: 16, weight: .regular, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.92))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        GeometryReader { geometry in
+            let metrics = PrivacyPolicyLayoutMetrics.make(screenSize: geometry.size)
 
-                    ForEach(document.sections) { section in
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(section.title)
-                                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white)
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+                        ForEach(document.preface, id: \.self) { paragraph in
+                            Text(paragraph)
+                                .font(.system(size: metrics.prefaceFontSize, weight: .regular, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.92))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
 
-                            ForEach(section.paragraphs, id: \.self) { paragraph in
-                                Text(paragraph)
-                                    .font(.system(size: 15, weight: .regular, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.88))
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
+                        ForEach(document.sections) { section in
+                            VStack(alignment: .leading, spacing: metrics.cardInnerSpacing) {
+                                Text(section.title)
+                                    .font(.system(size: metrics.sectionTitleFontSize, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(.white)
 
-                            ForEach(section.bullets, id: \.self) { bullet in
-                                HStack(alignment: .top, spacing: 8) {
-                                    Text("•")
-                                        .foregroundStyle(.white.opacity(0.88))
-                                    Text(bullet)
-                                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                                ForEach(section.paragraphs, id: \.self) { paragraph in
+                                    Text(paragraph)
+                                        .font(.system(size: metrics.bodyFontSize, weight: .regular, design: .rounded))
                                         .foregroundStyle(.white.opacity(0.88))
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
+
+                                ForEach(section.bullets, id: \.self) { bullet in
+                                    HStack(alignment: .top, spacing: metrics.bulletSpacing) {
+                                        Text("•")
+                                            .foregroundStyle(.white.opacity(0.88))
+                                        Text(bullet)
+                                            .font(.system(size: metrics.bodyFontSize, weight: .regular, design: .rounded))
+                                            .foregroundStyle(.white.opacity(0.88))
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(metrics.cardPadding)
+                            .background(
+                                Color.white.opacity(0.06),
+                                in: RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+                            )
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .padding(metrics.contentPadding)
+                }
+                .background(CalculatorColor.historyBackground)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Done") { dismiss() }
                     }
                 }
-                .padding(16)
+                .navigationTitle(document.title)
+                .navigationBarTitleDisplayMode(.inline)
             }
-            .background(CalculatorColor.historyBackground)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            .navigationTitle(document.title)
-            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
