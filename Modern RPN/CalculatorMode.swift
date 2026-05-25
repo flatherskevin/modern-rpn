@@ -12,6 +12,10 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
     case binary
     case hex
 
+    // Radix modes are single-line displays with hard caps so the value row never falls back to ellipsis.
+    private static let binaryDigitLimit = 15
+    private static let hexDigitLimit = 7
+
     var id: String { rawValue }
 
     var title: String {
@@ -73,9 +77,9 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
         case .standard:
             return true
         case .hex:
-            return isRadixBuffer(buffer, allowed: "0123456789ABCDEF")
+            return isRadixBuffer(buffer, allowed: "0123456789ABCDEF") && digitCount(in: buffer) < Self.hexDigitLimit
         case .binary:
-            return isRadixBuffer(buffer, allowed: "01")
+            return isRadixBuffer(buffer, allowed: "01") && digitCount(in: buffer) < Self.binaryDigitLimit
         }
     }
 
@@ -110,6 +114,21 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    func canRepresent(_ value: Double) -> Bool {
+        switch self {
+        case .standard:
+            return true
+        case .hex:
+            // Keep hex values within the width budget that preserves the shared display font size.
+            guard let formatted = formatRadix(value, radix: 16) else { return false }
+            return formatted.count <= Self.hexDigitLimit
+        case .binary:
+            // Binary is intentionally stricter because the narrow glyphs still need to stay single-line.
+            guard let formatted = formatRadix(value, radix: 2) else { return false }
+            return formatted.count <= Self.binaryDigitLimit
+        }
+    }
+
     private func parseRadix(_ text: String, radix: Int) -> Double? {
         guard !text.isEmpty else { return nil }
 
@@ -136,6 +155,11 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
         guard !digits.isEmpty else { return false }
 
         return digits.allSatisfy { allowed.contains($0) }
+    }
+
+    private func digitCount(in buffer: String) -> Int {
+        let digits = buffer.hasPrefix("-") ? buffer.dropFirst() : Substring(buffer)
+        return digits.count
     }
 }
 
