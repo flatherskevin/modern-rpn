@@ -105,12 +105,6 @@ private struct HistoryLayoutMetrics {
     let bottomPadding: CGFloat
     let filterBarHeight: CGFloat
     let filterBarHorizontalPadding: CGFloat
-    let filterMenuTopSpacing: CGFloat
-    let filterMenuWidth: CGFloat
-    let filterMenuRowHeight: CGFloat
-    let filterMenuRowPadding: CGFloat
-    let filterMenuContainerPadding: CGFloat
-    let filterMenuCornerRadius: CGFloat
     let toolbarButtonHeight: CGFloat
     let toolbarButtonHorizontalPadding: CGFloat
     let entryVerticalPadding: CGFloat
@@ -120,7 +114,6 @@ private struct HistoryLayoutMetrics {
         let compactHeight = screenSize.height <= 700
         let compactLayout = compactWidth || compactHeight
         let horizontalPadding: CGFloat = compactWidth ? 14 : 20
-        let filterMenuWidth = min(max(screenSize.width - (horizontalPadding * 2), 180), compactWidth ? 200 : 240)
 
         return HistoryLayoutMetrics(
             horizontalPadding: horizontalPadding,
@@ -128,12 +121,6 @@ private struct HistoryLayoutMetrics {
             bottomPadding: compactHeight ? 10 : 12,
             filterBarHeight: compactLayout ? 36 : 38,
             filterBarHorizontalPadding: compactLayout ? 12 : 14,
-            filterMenuTopSpacing: compactLayout ? 6 : 8,
-            filterMenuWidth: filterMenuWidth,
-            filterMenuRowHeight: compactLayout ? 40 : 42,
-            filterMenuRowPadding: compactLayout ? 12 : 14,
-            filterMenuContainerPadding: compactLayout ? 6 : 8,
-            filterMenuCornerRadius: compactLayout ? 20 : 22,
             toolbarButtonHeight: compactLayout ? 40 : 44,
             toolbarButtonHorizontalPadding: compactLayout ? 14 : 18,
             entryVerticalPadding: compactLayout ? 3 : 4
@@ -174,6 +161,7 @@ private struct PrivacyPolicyLayoutMetrics {
 struct ContentView: View {
     @StateObject private var viewModel = CalculatorViewModel()
     @State private var showingHistory = false
+    @State private var showingAbout = false
     @State private var showingPrivacyPolicy = false
 
     var body: some View {
@@ -202,6 +190,10 @@ struct ContentView: View {
             )
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showingAbout) {
+            AboutView()
+                .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $showingPrivacyPolicy) {
             PrivacyPolicyView()
                 .presentationDetents([.medium, .large])
@@ -226,6 +218,10 @@ struct ContentView: View {
             Menu {
                 Button("History") {
                     showingHistory = true
+                }
+
+                Button("About") {
+                    showingAbout = true
                 }
 
                 Button("Privacy Policy") {
@@ -467,7 +463,6 @@ private struct HistoryView: View {
     @Binding var filter: HistoryModeFilter
     let onFilterChange: (HistoryModeFilter) -> Void
     @State private var showingClearConfirmation = false
-    @State private var showingFilterOptions = false
 
     private var entries: [HistoryEntry] {
         guard let mode = filter.mode else { return store.entries }
@@ -494,81 +489,65 @@ private struct HistoryView: View {
             let metrics = HistoryLayoutMetrics.make(screenSize: geometry.size)
 
             NavigationStack {
-                ZStack(alignment: .topLeading) {
-                    VStack(spacing: 0) {
-                        historyFilterBar(metrics: metrics)
-                            .padding(.horizontal, metrics.horizontalPadding)
-                            .padding(.top, metrics.topPadding)
-                            .padding(.bottom, metrics.bottomPadding)
-                            .overlay(alignment: .bottomLeading) {
-                                if showingFilterOptions {
-                                    historyFilterMenu(metrics: metrics)
-                                        .padding(.top, metrics.filterMenuTopSpacing)
-                                }
-                            }
+                VStack(spacing: 0) {
+                    historyFilterBar(metrics: metrics)
+                        .padding(.horizontal, metrics.horizontalPadding)
+                        .padding(.top, metrics.topPadding)
+                        .padding(.bottom, metrics.bottomPadding)
 
-                        List {
-                            if entries.isEmpty {
-                                Text("No history yet")
-                                    .foregroundStyle(.white.opacity(0.75))
-                                    .listRowBackground(CalculatorColor.historyBackground)
-                            }
-
-                            ForEach(entries) { entry in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack(alignment: .firstTextBaseline) {
-                                        Text(entry.displayExpression)
-                                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
-                                            .foregroundStyle(CalculatorColor.displayText)
-
-                                        Spacer(minLength: 12)
-
-                                        Text(entry.modeTitle)
-                                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(entry.mode.theme.accentText)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(entry.mode.theme.accentBackground, in: Capsule())
-                                            .overlay {
-                                                Capsule()
-                                                    .stroke(entry.mode.theme.accentBorder, lineWidth: 1)
-                                            }
-                                    }
-                                    Text("= \(entry.displayResultText)")
-                                        .font(.system(size: 17, weight: .regular, design: .rounded))
-                                        .foregroundStyle(CalculatorColor.displayText)
-                                    Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.caption)
-                                        .foregroundStyle(CalculatorColor.historySecondaryText)
-                                }
-                                .padding(.vertical, metrics.entryVerticalPadding)
+                    List {
+                        if entries.isEmpty {
+                            Text("No history yet")
+                                .foregroundStyle(.white.opacity(0.75))
                                 .listRowBackground(CalculatorColor.historyBackground)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button("Delete", role: .destructive) {
-                                        store.removeEntry(id: entry.id)
-                                    }
+                        }
+
+                        ForEach(entries) { entry in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(entry.displayExpression)
+                                        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(CalculatorColor.displayText)
+
+                                    Spacer(minLength: 12)
+
+                                    Text(entry.modeTitle)
+                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(entry.mode.theme.accentText)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(entry.mode.theme.accentBackground, in: Capsule())
+                                        .overlay {
+                                            Capsule()
+                                                .stroke(entry.mode.theme.accentBorder, lineWidth: 1)
+                                        }
+                                }
+                                Text("= \(entry.displayResultText)")
+                                    .font(.system(size: 17, weight: .regular, design: .rounded))
+                                    .foregroundStyle(CalculatorColor.displayText)
+                                Text(entry.timestamp.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(CalculatorColor.historySecondaryText)
+                            }
+                            .padding(.vertical, metrics.entryVerticalPadding)
+                            .listRowBackground(CalculatorColor.historyBackground)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button("Delete", role: .destructive) {
+                                    store.removeEntry(id: entry.id)
                                 }
                             }
                         }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                        .background(CalculatorColor.historyBackground)
                     }
-
-                    if showingFilterOptions {
-                        Color.black.opacity(0.001)
-                            .ignoresSafeArea()
-                            .onTapGesture {
-                                showingFilterOptions = false
-                            }
-                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(CalculatorColor.historyBackground)
                 }
                 .background(CalculatorColor.historyBackground)
                 .foregroundStyle(.white)
                 .toolbarColorScheme(.dark, for: .navigationBar)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        toolbarButton("Done", disabled: false, metrics: metrics) { dismiss() }
+                        closeToolbarButton { dismiss() }
                     }
 
                     ToolbarItem(placement: .topBarTrailing) {
@@ -601,9 +580,17 @@ private struct HistoryView: View {
 
     private func historyFilterBar(metrics: HistoryLayoutMetrics) -> some View {
         HStack {
-            Button {
-                withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
-                    showingFilterOptions.toggle()
+            Menu {
+                ForEach(HistoryModeFilter.orderedCases) { option in
+                    Button {
+                        filter = option
+                    } label: {
+                        if option == filter {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
                 }
             } label: {
                 let theme = filter.theme
@@ -614,7 +601,7 @@ private struct HistoryView: View {
                     Text(filter.title)
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
                         .foregroundStyle(theme.accentText)
-                    Image(systemName: "slider.horizontal.3")
+                    Image(systemName: "chevron.down")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(CalculatorColor.historySecondaryText)
                 }
@@ -632,51 +619,6 @@ private struct HistoryView: View {
         }
     }
 
-    private func historyFilterMenu(metrics: HistoryLayoutMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(HistoryModeFilter.orderedCases) { option in
-                Button {
-                    filter = option
-                    withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
-                        showingFilterOptions = false
-                    }
-                } label: {
-                    HStack(spacing: 10) {
-                        Text(option.title)
-                            .font(.system(size: 15, weight: option == filter ? .semibold : .medium, design: .rounded))
-                            .foregroundStyle(option == filter ? option.theme.accentText : CalculatorColor.displayText)
-                        Spacer(minLength: 12)
-                        if option == filter {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(option.theme.accentText)
-                        }
-                    }
-                    .padding(.horizontal, metrics.filterMenuRowPadding)
-                    .frame(maxWidth: .infinity, minHeight: metrics.filterMenuRowHeight, alignment: .leading)
-                    .background(
-                        (option == filter ? option.theme.accentBackground : Color.clear),
-                        in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(width: metrics.filterMenuWidth, alignment: .leading)
-        .padding(metrics.filterMenuContainerPadding)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.filterMenuCornerRadius, style: .continuous)
-                .fill(Color(red: 0.12, green: 0.12, blue: 0.13))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: metrics.filterMenuCornerRadius, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.22), radius: 18, y: 10)
-        .transition(.asymmetric(insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .topLeading)), removal: .opacity))
-        .zIndex(1)
-    }
-
     private func toolbarButton(_ title: String, disabled: Bool, metrics: HistoryLayoutMetrics, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -691,6 +633,18 @@ private struct HistoryView: View {
                 .background(CalculatorColor.historyToolbarBackground, in: Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    private func closeToolbarButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(CalculatorColor.historyToolbarText)
+                .frame(width: 32, height: 32)
+                .background(CalculatorColor.historyToolbarBackground, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
     }
 }
 
@@ -750,13 +704,161 @@ private struct PrivacyPolicyView: View {
                 .background(CalculatorColor.historyBackground)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Done") { dismiss() }
+                        closeToolbarButton { dismiss() }
                     }
                 }
                 .navigationTitle(document.title)
                 .navigationBarTitleDisplayMode(.inline)
             }
         }
+    }
+
+    private func closeToolbarButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(CalculatorColor.historyToolbarText)
+                .frame(width: 32, height: 32)
+                .background(CalculatorColor.historyToolbarBackground, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
+    }
+}
+
+private struct AboutView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private let appStoreURL = URL(string: "https://apps.apple.com/us/app/modern-rpn/id6760340697")
+    private let developerProfileURL = URL(string: "https://github.com/flatherskevin")
+    private let issuesURL = URL(string: "https://github.com/flatherskevin/modern-rpn/issues")
+
+    var body: some View {
+        GeometryReader { geometry in
+            let metrics = PrivacyPolicyLayoutMetrics.make(screenSize: geometry.size)
+
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
+                        aboutHero(metrics: metrics)
+
+                        aboutCard(
+                            title: "Developer",
+                            metrics: metrics
+                        ) {
+                            if let developerProfileURL {
+                                Link("@flatherskevin", destination: developerProfileURL)
+                                    .font(.system(size: metrics.bodyFontSize, weight: .semibold, design: .rounded))
+                                    .tint(.white)
+                            }
+                        }
+
+                        aboutCard(
+                            title: "Version",
+                            metrics: metrics
+                        ) {
+                            Text(versionText)
+                                .font(.system(size: metrics.bodyFontSize, weight: .regular, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.88))
+                        }
+
+                        aboutCard(
+                            title: "Links",
+                            metrics: metrics
+                        ) {
+                            VStack(alignment: .leading, spacing: metrics.cardInnerSpacing) {
+                                if let issuesURL {
+                                    Link("GitHub Issues", destination: issuesURL)
+                                        .font(.system(size: metrics.bodyFontSize, weight: .semibold, design: .rounded))
+                                }
+
+                                if let appStoreURL {
+                                    Link("App Store Listing", destination: appStoreURL)
+                                        .font(.system(size: metrics.bodyFontSize, weight: .semibold, design: .rounded))
+                                }
+                            }
+                            .tint(.white)
+                        }
+                    }
+                    .padding(metrics.contentPadding)
+                }
+                .background(CalculatorColor.historyBackground)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        closeToolbarButton { dismiss() }
+                    }
+                }
+                .navigationTitle("About")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+    }
+
+    private var versionText: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let buildNumber = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+
+        switch (shortVersion, buildNumber) {
+        case let (.some(version), .some(build)):
+            return "Version \(version) (\(build))"
+        case let (.some(version), .none):
+            return "Version \(version)"
+        case let (.none, .some(build)):
+            return "Build \(build)"
+        default:
+            return "Version unavailable"
+        }
+    }
+
+    private func aboutHero(metrics: PrivacyPolicyLayoutMetrics) -> some View {
+        VStack(alignment: .leading, spacing: metrics.cardInnerSpacing) {
+            Text("Modern RPN")
+                .font(.system(size: metrics.sectionTitleFontSize + 6, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+
+            Text("Minimal reverse polish notation calculator for iPhone and iPad with Standard, Binary, and Hex modes.")
+                .font(.system(size: metrics.prefaceFontSize, weight: .regular, design: .rounded))
+                .foregroundStyle(.white.opacity(0.88))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(metrics.cardPadding)
+        .background(
+            Color.white.opacity(0.06),
+            in: RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+        )
+    }
+
+    private func aboutCard<Content: View>(
+        title: String,
+        metrics: PrivacyPolicyLayoutMetrics,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: metrics.cardInnerSpacing) {
+            Text(title)
+                .font(.system(size: metrics.sectionTitleFontSize, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(metrics.cardPadding)
+        .background(
+            Color.white.opacity(0.06),
+            in: RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+        )
+    }
+
+    private func closeToolbarButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(CalculatorColor.historyToolbarText)
+                .frame(width: 32, height: 32)
+                .background(CalculatorColor.historyToolbarBackground, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
     }
 }
 
