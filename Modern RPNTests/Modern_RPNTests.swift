@@ -5,9 +5,9 @@ final class RPNCalculatorTests: XCTestCase {
     func testCompactHexLayoutShrinksButtonsForSEHeight() {
         let metrics = CalculatorLayoutMetrics.make(screenSize: CGSize(width: 375, height: 667), safeAreaBottom: 0, rowCount: 7)
 
-        XCTAssertEqual(metrics.buttonHeight, 46)
+        XCTAssertEqual(metrics.buttonHeight, 57)
         XCTAssertEqual(metrics.buttonSpacing, 4)
-        XCTAssertEqual(metrics.displayFontSize, 56)
+        XCTAssertEqual(metrics.displayFontSize, 64)
         XCTAssertTrue(metrics.prefersScrollFallback)
     }
 
@@ -17,9 +17,9 @@ final class RPNCalculatorTests: XCTestCase {
 
         XCTAssertFalse(standardMetrics.prefersScrollFallback)
         XCTAssertTrue(hexMetrics.prefersScrollFallback)
-        XCTAssertEqual(standardMetrics.buttonHeight, 50)
+        XCTAssertEqual(standardMetrics.buttonHeight, 60)
         XCTAssertEqual(standardMetrics.displayFontSize, 64)
-        XCTAssertEqual(hexMetrics.buttonHeight, 46)
+        XCTAssertEqual(hexMetrics.buttonHeight, 57)
     }
 
     func testInitialState() {
@@ -97,15 +97,193 @@ final class RPNCalculatorTests: XCTestCase {
         XCTAssertEqual(calculator.inputBuffer, "1")
     }
 
-    func testHexModeShowsFractionalResultsInDecimal() {
+    func testFinancialModeSupportsDecimalInput() {
+        let calculator = RPNCalculator(mode: .financial)
+
+        calculator.tapDigit("1")
+        calculator.tapDecimal()
+        calculator.tapDigit("5")
+
+        XCTAssertEqual(calculator.displayText, "1.5")
+    }
+
+    func testModeDescriptorsDeclareExpectedOrientationsAndOrder() {
+        XCTAssertEqual(CalculatorMode.orderedModes, [.standard, .binary, .hex, .financial])
+        XCTAssertEqual(CalculatorMode.standard.orientation, .portrait)
+        XCTAssertEqual(CalculatorMode.binary.orientation, .portrait)
+        XCTAssertEqual(CalculatorMode.hex.orientation, .portrait)
+        XCTAssertEqual(CalculatorMode.financial.orientation, .portrait)
+    }
+
+    func testFinancialModeSolvesFutureValue() {
+        let calculator = RPNCalculator(mode: .financial)
+
+        enter("2", into: calculator)
+        _ = calculator.performFinancialAction(.numberOfPeriods)
+        enter("5", into: calculator)
+        _ = calculator.performFinancialAction(.interestRate)
+        enter("-1000", into: calculator)
+        _ = calculator.performFinancialAction(.presentValue)
+        enter("0", into: calculator)
+        _ = calculator.performFinancialAction(.payment)
+
+        let outcome = calculator.performFinancialAction(.futureValue)
+
+        XCTAssertEqual(outcome?.result ?? .nan, 1_102.5, accuracy: 0.000_001)
+        XCTAssertEqual(calculator.displayText, "1,102.5")
+        XCTAssertEqual(calculator.financialRegisters.value(for: .futureValue) ?? .nan, 1_102.5, accuracy: 0.000_001)
+    }
+
+    func testFinancialQuickActionsSupportRollDownClearXAndExponentEntry() {
+        let calculator = RPNCalculator(mode: .financial)
+
+        push(1, onto: calculator)
+        push(2, onto: calculator)
+        push(3, onto: calculator)
+        calculator.rollDown()
+
+        XCTAssertEqual(calculator.stack, [3, 1, 2])
+
+        calculator.clearX()
+        XCTAssertEqual(calculator.stack, [3, 1])
+
+        calculator.tapDigit("1")
+        calculator.enterExponent()
+        calculator.tapDigit("2")
+        _ = calculator.enter()
+
+        XCTAssertEqual(calculator.displayText, "100")
+    }
+
+    func testFinancialPaymentModeMemoryAndCashFlowCalculations() throws {
+        let calculator = RPNCalculator(mode: .financial)
+
+        enter("5", into: calculator)
+        try calculator.storeMemory(index: 3)
+        let recall = try calculator.recallMemory(index: 3)
+        XCTAssertEqual(recall?.resultText, "5")
+
+        calculator.setPaymentMode(.begin)
+        XCTAssertEqual(calculator.paymentMode, .begin)
+
+        calculator.setCashFlowInitialAmount(-1000)
+        try calculator.addCashFlowEntry(amount: 300, count: 4)
+
+        let npv = try calculator.calculateNetPresentValue(ratePercent: 8)
+        XCTAssertEqual(npv.result, -6.361947986700329, accuracy: 0.000_001)
+
+        calculator.clearAll()
+        calculator.setCashFlowInitialAmount(-1000)
+        try calculator.addCashFlowEntry(amount: 400, count: 4)
+        let irr = try calculator.calculateInternalRateOfReturn()
+        XCTAssertEqual(irr.result, 21.862_269_609_834_23, accuracy: 0.001)
+    }
+
+    func testPercentCalculationsProduceExpectedResults() throws {
+        let calculator = RPNCalculator(mode: .financial)
+
+        let percent = calculator.calculatePercent(base: 200, percent: 15)
+        XCTAssertEqual(percent.result, 30, accuracy: 0.000_001)
+
+        let percentOfTotal = try calculator.calculatePercentOfTotal(part: 25, total: 200)
+        XCTAssertEqual(percentOfTotal.result, 12.5, accuracy: 0.000_001)
+
+        let percentDifference = try calculator.calculatePercentDifference(from: 80, to: 100)
+        XCTAssertEqual(percentDifference.result, 25, accuracy: 0.000_001)
+    }
+
+    func testPercentCalculationsRejectDivideByZeroInputs() {
+        let calculator = RPNCalculator(mode: .financial)
+
+        XCTAssertThrowsError(try calculator.calculatePercentOfTotal(part: 25, total: 0)) { error in
+            XCTAssertEqual((error as? LocalizedError)?.errorDescription, "Invalid financial inputs")
+        }
+
+        XCTAssertThrowsError(try calculator.calculatePercentDifference(from: 0, to: 100)) { error in
+            XCTAssertEqual((error as? LocalizedError)?.errorDescription, "Invalid financial inputs")
+        }
+    }
+
+    func testFinancialDateBondAndAmortizationFunctions() throws {
+        let calculator = RPNCalculator(mode: .financial)
+        let calendar = Calendar(identifier: .gregorian)
+        let startDate = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let endDate = calendar.date(from: DateComponents(year: 2026, month: 1, day: 31))!
+
+        let days = try calculator.calculateDaysBetween(from: startDate, to: endDate)
+        XCTAssertEqual(days.resultText, "30")
+
+        let futureDate = try calculator.calculateDateByAdding(days: 30, to: startDate)
+        XCTAssertEqual(futureDate.resultText, "2026-01-31")
+
+        let settlement = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let maturity = calendar.date(from: DateComponents(year: 2031, month: 1, day: 1))!
+        let price = try calculator.calculateBondPrice(
+            settlement: settlement,
+            maturity: maturity,
+            couponRatePercent: 5,
+            yieldPercent: 4
+        )
+        XCTAssertEqual(price.result, 104.49129250312109, accuracy: 0.000_001)
+
+        let yield = try calculator.calculateBondYield(
+            settlement: settlement,
+            maturity: maturity,
+            couponRatePercent: 5,
+            price: price.result
+        )
+        XCTAssertEqual(yield.result, 4, accuracy: 0.001)
+
+        enter("12", into: calculator)
+        _ = calculator.performFinancialAction(.numberOfPeriods)
+        enter("1", into: calculator)
+        _ = calculator.performFinancialAction(.interestRate)
+        enter("-1000", into: calculator)
+        _ = calculator.performFinancialAction(.presentValue)
+        enter("0", into: calculator)
+        _ = calculator.performFinancialAction(.futureValue)
+        enter("88.84878867834168", into: calculator)
+        _ = calculator.performFinancialAction(.payment)
+
+        let amortization = try calculator.calculateAmortization(periods: 3)
+        XCTAssertEqual(amortization.principalPaid, 238.91971457424313, accuracy: 0.000_001)
+        XCTAssertEqual(amortization.interestPaid, 27.62665146078192, accuracy: 0.000_001)
+        XCTAssertEqual(amortization.remainingBalance, 761.0802854257569, accuracy: 0.000_001)
+    }
+
+    func testHexModeRejectsFractionalResultsThatDoNotFitTheRadixRules() {
         let calculator = RPNCalculator(mode: .hex)
         push(3, onto: calculator)
         push(2, onto: calculator)
 
         let outcome = calculator.perform(.divide)
 
-        XCTAssertEqual(outcome?.resultText, "1.5")
-        XCTAssertEqual(calculator.displayText, "1.5")
+        XCTAssertNil(outcome)
+        XCTAssertEqual(calculator.errorMessage, "Value exceeds hex limit")
+        XCTAssertEqual(calculator.displayText, "2")
+        XCTAssertEqual(calculator.stack, [3, 2])
+    }
+
+    func testHexModeRejectsInputLongerThanVisibleValueBudget() {
+        let calculator = RPNCalculator(mode: .hex)
+
+        "12345678".forEach { calculator.tapDigit(String($0)) }
+
+        XCTAssertEqual(calculator.displayText, "1234567")
+        XCTAssertEqual(calculator.inputBuffer, "1234567")
+    }
+
+    func testBinaryModeRejectsOversizedOperationResults() {
+        let calculator = RPNCalculator()
+        push(32_767, onto: calculator)
+        push(1, onto: calculator)
+        calculator.setMode(.binary)
+
+        let outcome = calculator.perform(.add)
+
+        XCTAssertNil(outcome)
+        XCTAssertEqual(calculator.errorMessage, "Value exceeds binary limit")
+        XCTAssertEqual(calculator.stack, [32_767, 1])
     }
 
     func testToggleSignForTypingValue() {
@@ -324,22 +502,65 @@ final class RPNCalculatorTests: XCTestCase {
         XCTAssertEqual(RPNCalculator.format(.nan), "NaN")
     }
 
-    func testModeSwitchReformatsExistingStack() {
+    func testModeSwitchRestoresIndependentStatePerMode() {
         let calculator = RPNCalculator()
         push(15, onto: calculator)
 
         calculator.setMode(.hex)
+        calculator.tapDigit("A")
+        _ = calculator.enter()
 
-        XCTAssertEqual(calculator.displayText, "F")
-        XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: F"])
+        calculator.setMode(.standard)
+
+        XCTAssertEqual(calculator.displayText, "15")
+        XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: 15"])
+
+        calculator.setMode(.hex)
+
+        XCTAssertEqual(calculator.displayText, "A")
+        XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: A"])
+    }
+
+    func testModeSwitchRejectsStackValuesThatDoNotFitTargetMode() {
+        let calculator = RPNCalculator()
+        push(Double(1 << 20), onto: calculator)
+
+        calculator.setMode(.hex)
+
+        XCTAssertEqual(calculator.mode, .hex)
+        XCTAssertNil(calculator.errorMessage)
+        XCTAssertEqual(calculator.stack, [])
+    }
+
+    func testRestoreDropsNonRepresentableValuesFromPerModeState() {
+        let calculator = RPNCalculator(mode: .standard)
+        let session = CalculatorSession(
+            mode: .binary,
+            modeStates: [
+                .standard: CalculatorModeState(stack: [42], inputBuffer: "0", isTyping: false),
+                .binary: CalculatorModeState(
+                    stack: [3, 32_768],
+                    inputBuffer: "1111111111111111",
+                    isTyping: true
+                )
+            ]
+        )
+
+        calculator.restore(session: session)
+
+        XCTAssertEqual(calculator.mode, .binary)
+        XCTAssertEqual(calculator.stack, [3])
+        XCTAssertEqual(calculator.displayText, "11")
+        XCTAssertFalse(calculator.isTyping)
     }
 
     private func push(_ value: Double, onto calculator: RPNCalculator) {
         let formatted = RPNCalculator.format(value)
+        let isNegative = formatted.hasPrefix("-")
         for char in formatted {
             switch char {
             case "-":
-                calculator.toggleSign()
+                continue
             case ".":
                 calculator.tapDecimal()
             case ",":
@@ -347,6 +568,9 @@ final class RPNCalculatorTests: XCTestCase {
             default:
                 calculator.tapDigit(String(char))
             }
+        }
+        if isNegative {
+            calculator.toggleSign()
         }
         _ = calculator.enter()
     }
@@ -477,6 +701,97 @@ final class AppSessionStoreTests: XCTestCase {
         XCTAssertEqual(store.loadHistoryFilter(), .binary)
     }
 
+    func testFinancialSessionPersistsAndReloadsRegisters() {
+        let defaults = makeDefaults()
+        let store = AppSessionStore(
+            userDefaults: defaults,
+            sessionKey: "session-\(UUID().uuidString)",
+            historyFilterKey: "filter-\(UUID().uuidString)"
+        )
+
+        var registers = FinancialRegisters()
+        registers.set(12, for: .numberOfPeriods)
+        registers.set(5, for: .interestRate)
+        let session = CalculatorSession(
+            mode: .financial,
+            stack: [42],
+            inputBuffer: "0",
+            isTyping: false,
+            financialRegisters: registers
+        )
+
+        store.saveSession(session)
+
+        XCTAssertEqual(store.loadSession(), session)
+    }
+
+    func testSessionPersistsIndependentModeStates() {
+        let defaults = makeDefaults()
+        let store = AppSessionStore(
+            userDefaults: defaults,
+            sessionKey: "session-\(UUID().uuidString)",
+            historyFilterKey: "filter-\(UUID().uuidString)"
+        )
+
+        let session = CalculatorSession(
+            mode: .hex,
+            modeStates: [
+                .standard: CalculatorModeState(stack: [42], inputBuffer: "0", isTyping: false),
+                .hex: CalculatorModeState(stack: [255], inputBuffer: "FF", isTyping: true),
+                .binary: CalculatorModeState(stack: [10], inputBuffer: "1010", isTyping: true)
+            ]
+        )
+
+        store.saveSession(session)
+
+        let restored = store.loadSession()
+        XCTAssertEqual(restored?.mode, .hex)
+        XCTAssertEqual(restored?.state(for: .standard).stack, [42])
+        XCTAssertEqual(restored?.state(for: .hex).inputBuffer, "FF")
+        XCTAssertEqual(restored?.state(for: .binary).inputBuffer, "1010")
+    }
+
+    func testFinancialRegistersDecodeFromOlderSessionPayload() throws {
+        let json = """
+        {
+          "mode": "financial",
+          "stack": [42],
+          "inputBuffer": "0",
+          "isTyping": false,
+          "financialRegisters": {
+            "values": {
+              "numberOfPeriods": 12,
+              "interestRate": 5
+            }
+          }
+        }
+        """.data(using: .utf8)!
+
+        let session = try JSONDecoder().decode(CalculatorSession.self, from: json)
+
+        XCTAssertEqual(session.financialRegisters.value(for: .numberOfPeriods), 12)
+        XCTAssertEqual(session.financialRegisters.value(for: .interestRate), 5)
+        XCTAssertEqual(session.financialRegisters.paymentMode, .end)
+        XCTAssertTrue(session.financialRegisters.memoryRegisters.isEmpty)
+        XCTAssertEqual(session.financialRegisters.cashFlowInitialAmount, 0)
+        XCTAssertTrue(session.financialRegisters.cashFlowEntries.isEmpty)
+    }
+
+    func testMissingFinancialRegistersDecodeToDefaultSessionState() throws {
+        let json = """
+        {
+          "mode": "standard",
+          "stack": [42],
+          "inputBuffer": "0",
+          "isTyping": false
+        }
+        """.data(using: .utf8)!
+
+        let session = try JSONDecoder().decode(CalculatorSession.self, from: json)
+
+        XCTAssertEqual(session.financialRegisters, FinancialRegisters())
+    }
+
     private func makeDefaults() -> UserDefaults {
         let suiteName = "ModernRPNTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)
@@ -505,16 +820,33 @@ final class CalculatorViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.mode, .hex)
     }
 
-    func testModeSwitchUpdatesFormatting() {
+    func testFinancialModeCanBeChanged() {
+        let viewModel = makeViewModel()
+
+        viewModel.setMode(.financial)
+
+        XCTAssertEqual(viewModel.mode, .financial)
+    }
+
+    func testModeSwitchRestoresIndependentViewModelState() {
         let viewModel = makeViewModel()
 
         viewModel.tapDigit("1")
         viewModel.tapDigit("5")
         viewModel.enter()
         viewModel.setMode(.hex)
+        viewModel.tapDigit("A")
+        viewModel.enter()
 
-        XCTAssertEqual(viewModel.displayText, "F")
-        XCTAssertEqual(viewModel.stackLines, ["T:", "Z:", "Y:", "X: F"])
+        viewModel.setMode(.standard)
+
+        XCTAssertEqual(viewModel.displayText, "15")
+        XCTAssertEqual(viewModel.stackLines, ["T:", "Z:", "Y:", "X: 15"])
+
+        viewModel.setMode(.hex)
+
+        XCTAssertEqual(viewModel.displayText, "A")
+        XCTAssertEqual(viewModel.stackLines, ["T:", "Z:", "Y:", "X: A"])
     }
 
     func testSuccessfulOperationUpdatesDisplayStackAndHistory() {
@@ -597,6 +929,46 @@ final class CalculatorViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.historyFilter, .hex)
     }
 
+    func testFinancialActionUpdatesRegistersAndHistory() {
+        let viewModel = makeViewModel()
+        viewModel.setMode(.financial)
+
+        enter("2", into: viewModel)
+        viewModel.performFinancialAction(.numberOfPeriods)
+        enter("5", into: viewModel)
+        viewModel.performFinancialAction(.interestRate)
+        enter("-1000", into: viewModel)
+        viewModel.performFinancialAction(.presentValue)
+        enter("0", into: viewModel)
+        viewModel.performFinancialAction(.payment)
+        viewModel.performFinancialAction(.futureValue)
+
+        XCTAssertEqual(viewModel.displayText, "1102.5")
+        XCTAssertEqual(viewModel.financialRegisterLines.last, "FV: 1102.5")
+        XCTAssertEqual(viewModel.historyStore.entries.first?.expression, "Solve FV")
+        XCTAssertEqual(viewModel.historyStore.entries.first?.mode, .financial)
+    }
+
+    func testFinancialToolsActionsUpdatePublishedState() {
+        let viewModel = makeViewModel()
+        viewModel.setMode(.financial)
+
+        enter("9", into: viewModel)
+        viewModel.storeMemory(index: 2)
+        XCTAssertEqual(viewModel.memoryRegisters[2], 9)
+
+        viewModel.recallMemory(index: 2)
+        XCTAssertEqual(viewModel.displayText, "9")
+
+        viewModel.setPaymentMode(.begin)
+        XCTAssertEqual(viewModel.paymentMode, .begin)
+
+        viewModel.setCashFlowInitialAmount(-1000)
+        viewModel.addCashFlowEntry(amount: 300, count: 2)
+        XCTAssertEqual(viewModel.cashFlowInitialAmount, -1000)
+        XCTAssertEqual(viewModel.cashFlowEntries.count, 1)
+    }
+
     func testViewModelRestoresPersistedSessionAndFilter() {
         let suiteName = "ModernRPNTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)
@@ -618,7 +990,11 @@ final class CalculatorViewModelTests: XCTestCase {
         )
         sessionStore.saveHistoryFilter(.hex)
 
-        let viewModel = CalculatorViewModel(historyStore: historyStore, sessionStore: sessionStore)
+        let viewModel = CalculatorViewModel(
+            historyStore: historyStore,
+            sessionStore: sessionStore,
+            launchConfiguration: AppLaunchConfiguration()
+        )
 
         XCTAssertEqual(viewModel.mode, .hex)
         XCTAssertEqual(viewModel.displayText, "A")
@@ -642,6 +1018,112 @@ final class CalculatorViewModelTests: XCTestCase {
             historyFilterKey: "filter-\(UUID().uuidString)"
         )
 
-        return CalculatorViewModel(historyStore: store, sessionStore: sessionStore)
+        return CalculatorViewModel(
+            historyStore: store,
+            sessionStore: sessionStore,
+            launchConfiguration: AppLaunchConfiguration()
+        )
+    }
+
+    private func enter(_ value: String, into viewModel: CalculatorViewModel) {
+        for char in value {
+            switch char {
+            case "-":
+                viewModel.toggleSign()
+            case ".":
+                viewModel.tapDecimal()
+            default:
+                viewModel.tapDigit(String(char))
+            }
+        }
+    }
+}
+
+final class AppLaunchConfigurationTests: XCTestCase {
+    func testInvalidScreenshotScenarioFallsBackToDefaultConfiguration() {
+        let configuration = AppLaunchConfiguration(
+            arguments: [
+                "Modern RPN",
+                AppLaunchConfiguration.screenshotScenarioArgument,
+                "not-a-real-scenario"
+            ]
+        )
+
+        XCTAssertNil(configuration.userDefaults)
+        XCTAssertNil(configuration.seededSession)
+        XCTAssertNil(configuration.seededHistoryEntries)
+        XCTAssertNil(configuration.seededHistoryFilter)
+        if case .none = configuration.presentedSheet {
+        } else {
+            XCTFail("Expected invalid scenarios to fall back to the default launch configuration")
+        }
+    }
+
+    func testDefaultsWhenNoScreenshotScenarioArgumentIsPresent() {
+        let configuration = AppLaunchConfiguration(arguments: ["Modern RPN"])
+
+        XCTAssertNil(configuration.userDefaults)
+        XCTAssertNil(configuration.seededSession)
+        XCTAssertNil(configuration.seededHistoryEntries)
+        XCTAssertNil(configuration.seededHistoryFilter)
+        if case .none = configuration.presentedSheet {
+        } else {
+            XCTFail("Expected no sheet to be pre-presented")
+        }
+    }
+
+    func testScreenshotScenarioSeedsFinancialWorksheetState() {
+        let configuration = AppLaunchConfiguration(
+            arguments: [
+                "Modern RPN",
+                AppLaunchConfiguration.screenshotScenarioArgument,
+                ScreenshotScenario.financialToolsWorksheet.rawValue
+            ]
+        )
+
+        XCTAssertEqual(configuration.seededSession?.mode, .financial)
+        XCTAssertEqual(configuration.seededHistoryFilter, .financial)
+        if case .financialTools = configuration.presentedSheet {
+        } else {
+            XCTFail("Expected financial tools sheet to be pre-presented")
+        }
+        XCTAssertEqual(configuration.seededSession?.financialRegisters.paymentMode, .begin)
+        XCTAssertEqual(configuration.seededHistoryEntries?.count, 4)
+    }
+
+    func testScreenshotScenarioCanPreopenHistorySheet() {
+        let configuration = AppLaunchConfiguration(
+            arguments: [
+                "Modern RPN",
+                AppLaunchConfiguration.screenshotScenarioArgument,
+                ScreenshotScenario.historySheetRecentCalculations.rawValue
+            ]
+        )
+
+        XCTAssertEqual(configuration.seededSession?.mode, .standard)
+        XCTAssertEqual(configuration.seededSession?.stack, [42])
+        if case .history = configuration.presentedSheet {
+        } else {
+            XCTFail("Expected history scenario to pre-present the history sheet")
+        }
+    }
+}
+
+private extension RPNCalculatorTests {
+    func enter(_ value: String, into calculator: RPNCalculator) {
+        let isNegative = value.hasPrefix("-")
+        for char in value {
+            switch char {
+            case "-":
+                continue
+            case ".":
+                calculator.tapDecimal()
+            default:
+                calculator.tapDigit(String(char))
+            }
+        }
+        if isNegative {
+            calculator.toggleSign()
+        }
     }
 }

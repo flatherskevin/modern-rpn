@@ -21,8 +21,9 @@ private enum CalculatorButtonKind {
     case radixLetter
     case operation
     case enter
+    case financial
 
-    var fillColor: Color {
+    func fillColor(for mode: CalculatorMode) -> Color {
         switch self {
         case .utility:
             return CalculatorColor.utilityButton
@@ -34,10 +35,12 @@ private enum CalculatorButtonKind {
             return CalculatorColor.operatorButton
         case .enter:
             return CalculatorColor.enterButton
+        case .financial:
+            return mode.theme.accentBackground
         }
     }
 
-    var textColor: Color {
+    func textColor(for mode: CalculatorMode) -> Color {
         switch self {
         case .utility:
             return .black
@@ -45,30 +48,38 @@ private enum CalculatorButtonKind {
             return .white
         case .radixLetter:
             return CalculatorMode.hex.theme.accentText
+        case .financial:
+            return mode.theme.accentText
         }
     }
 }
 
-private struct CalculatorButtonDefinition {
-    let label: String
-    let span: Int
-    let kind: CalculatorButtonKind
-    let action: () -> Void
-
-    init(
-        label: String,
-        span: Int = 1,
-        kind: CalculatorButtonKind,
-        action: @escaping () -> Void
-    ) {
-        self.label = label
-        self.span = span
-        self.kind = kind
-        self.action = action
+private extension CalculatorButtonKind {
+    static func make(for spec: CalculatorButtonSpec, mode: CalculatorMode) -> CalculatorButtonKind? {
+        switch spec.role {
+        case .utility:
+            return .utility
+        case .digit(let digit):
+            if mode == .hex, "ABCDEF".contains(digit) {
+                return .radixLetter
+            }
+            return .number
+        case .decimal:
+            return .number
+        case .operation:
+            return .operation
+        case .financial:
+            return .financial
+        case .enter:
+            return .enter
+        case .spacer:
+            return nil
+        }
     }
 }
 
 private struct CalculatorPressStyle: ButtonStyle {
+    let mode: CalculatorMode
     let color: Color
     let span: Int
     let height: CGFloat
@@ -80,13 +91,16 @@ private struct CalculatorPressStyle: ButtonStyle {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .frame(height: height)
             .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(color)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).fill(color)
                 .overlay {
                     if configuration.isPressed {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(Color.white.opacity(0.2))
                     }
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(borderColor, lineWidth: mode == .financial ? 1 : 0)
                 }
             }
             .scaleEffect(configuration.isPressed ? pressedScale : 1.0)
@@ -96,6 +110,10 @@ private struct CalculatorPressStyle: ButtonStyle {
 
     private var pressedScale: CGFloat {
         span > 1 ? 1.02 : 1.04
+    }
+
+    private var borderColor: Color {
+        mode == .financial ? mode.theme.accentBorder.opacity(0.45) : .clear
     }
 }
 
@@ -159,28 +177,51 @@ private struct PrivacyPolicyLayoutMetrics {
 }
 
 struct ContentView: View {
-    @StateObject private var viewModel = CalculatorViewModel()
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var viewModel: CalculatorViewModel
     @State private var showingHistory = false
     @State private var showingAbout = false
     @State private var showingPrivacyPolicy = false
+    @State private var showingFinancialTools = false
+
+    init(launchConfiguration: AppLaunchConfiguration = .currentProcess) {
+        _viewModel = StateObject(
+            wrappedValue: CalculatorViewModel(launchConfiguration: launchConfiguration)
+        )
+        _showingHistory = State(initialValue: launchConfiguration.presentedSheet == .history)
+        _showingAbout = State(initialValue: launchConfiguration.presentedSheet == .about)
+        _showingPrivacyPolicy = State(initialValue: launchConfiguration.presentedSheet == .privacyPolicy)
+        _showingFinancialTools = State(initialValue: launchConfiguration.presentedSheet == .financialTools)
+    }
 
     var body: some View {
         GeometryReader { geometry in
             let metrics = CalculatorLayoutMetrics.make(
                 screenSize: geometry.size,
                 safeAreaBottom: geometry.safeAreaInsets.bottom,
-                rowCount: buttonRows().count
+                rowCount: viewModel.mode.keypadRows.count
             )
 
             ZStack {
                 CalculatorColor.background
                     .ignoresSafeArea()
 
-                calculatorBody(metrics: metrics)
+                calculatorLayout(in: geometry, metrics: metrics)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .padding(.horizontal, metrics.horizontalPadding)
                     .padding(.top, metrics.topPadding)
                     .padding(.bottom, metrics.bottomPadding)
             }
+        }
+        .onAppear {
+            OrientationCoordinator.shared.apply(for: viewModel.mode)
+        }
+        .onChange(of: viewModel.mode) { _, newMode in
+            OrientationCoordinator.shared.apply(for: newMode)
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            OrientationCoordinator.shared.apply(for: viewModel.mode)
         }
         .sheet(isPresented: $showingHistory) {
             HistoryView(
@@ -198,19 +239,39 @@ struct ContentView: View {
             PrivacyPolicyView()
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showingFinancialTools) {
+            FinancialToolsView(viewModel: viewModel)
+                .presentationDetents([.large])
+        }
     }
 
-    private func calculatorBody(metrics: CalculatorLayoutMetrics) -> some View {
-        VStack(spacing: metrics.contentSpacing) {
-            header(metrics: metrics)
-                .frame(height: metrics.headerHeight)
-            stackPanel(metrics: metrics)
-            display(metrics: metrics)
-                .frame(height: metrics.displayAreaHeight, alignment: .bottom)
-            buttonGrid(metrics: metrics)
-                .frame(height: metrics.buttonGridHeight, alignment: .top)
+    @ViewBuilder
+    private func calculatorLayout(in geometry: GeometryProxy, metrics: CalculatorLayoutMetrics) -> some View {
+        switch viewModel.mode.layoutStyle {
+        case .standard:
+            VStack(spacing: metrics.contentSpacing) {
+                header(metrics: metrics)
+                    .frame(height: metrics.headerHeight)
+                stackPanel(metrics: metrics)
+                display(metrics: metrics)
+                    .frame(height: metrics.displayAreaHeight, alignment: .bottom)
+                buttonGrid(metrics: metrics)
+                    .frame(height: metrics.buttonGridHeight, alignment: .top)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        case .financialLandscape:
+            let headerHeight: CGFloat = 54
+            let bodyAvailableHeight = max(260, geometry.size.height - metrics.topPadding - metrics.bottomPadding - headerHeight)
+
+            VStack(spacing: 10) {
+                header(metrics: metrics)
+                financialCalculatorBody(
+                    availableWidth: geometry.size.width - (metrics.horizontalPadding * 2),
+                    availableHeight: bodyAvailableHeight
+                )
+                    .frame(maxHeight: .infinity, alignment: .top)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private func header(metrics: CalculatorLayoutMetrics) -> some View {
@@ -239,7 +300,7 @@ struct ContentView: View {
             Spacer()
 
             Menu {
-                ForEach(CalculatorMode.allCases) { mode in
+                ForEach(CalculatorMode.orderedModes) { mode in
                     Button {
                         viewModel.setMode(mode)
                     } label: {
@@ -266,8 +327,23 @@ struct ContentView: View {
 
             Spacer()
 
-            Color.clear
-                .frame(width: metrics.headerButtonSize, height: metrics.headerButtonSize)
+            Group {
+                if viewModel.mode == .financial {
+                    Button {
+                        showingFinancialTools = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(CalculatorColor.displayText)
+                            .frame(width: metrics.headerButtonSize, height: metrics.headerButtonSize)
+                    }
+                    .accessibilityLabel("Financial Tools")
+                    .accessibilityIdentifier("financial-tools-button")
+                } else {
+                    Color.clear
+                        .frame(width: metrics.headerButtonSize, height: metrics.headerButtonSize)
+                }
+            }
         }
     }
 
@@ -279,12 +355,14 @@ struct ContentView: View {
                 (contentHeight - (metrics.stackSpacing * 3)) / 4
             )
 
-            VStack(alignment: .leading, spacing: metrics.stackSpacing) {
-                ForEach(viewModel.stackLines, id: \.self) { line in
-                    Text(line)
-                        .font(.system(size: metrics.stackFontSize, weight: .medium, design: .monospaced))
-                        .foregroundStyle(CalculatorColor.stackText)
-                        .frame(maxWidth: .infinity, minHeight: rowHeight, maxHeight: rowHeight, alignment: .topLeading)
+            Group {
+                if viewModel.mode == .financial {
+                    HStack(alignment: .top, spacing: 18) {
+                        stackColumn(lines: viewModel.stackLines, rowHeight: rowHeight, metrics: metrics)
+                        stackColumn(lines: viewModel.financialRegisterLines, rowHeight: rowHeight, metrics: metrics)
+                    }
+                } else {
+                    stackColumn(lines: viewModel.stackLines, rowHeight: rowHeight, metrics: metrics)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -293,6 +371,58 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         .frame(height: metrics.stackPanelHeight, alignment: .topLeading)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func stackColumn(lines: [String], rowHeight: CGFloat, metrics: CalculatorLayoutMetrics) -> some View {
+        VStack(alignment: .leading, spacing: metrics.stackSpacing) {
+            ForEach(lines, id: \.self) { line in
+                Text(line)
+                    .font(.system(size: metrics.stackFontSize, weight: .medium, design: .monospaced))
+                    .foregroundStyle(CalculatorColor.stackText)
+                    .frame(maxWidth: .infinity, minHeight: rowHeight, maxHeight: rowHeight, alignment: .topLeading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var financialStatusPanel: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("STACK")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(CalculatorColor.stackText)
+                    .tracking(1.1)
+                    .padding(.bottom, 4)
+
+                ForEach(viewModel.stackLines, id: \.self) { line in
+                    Text(line)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundStyle(CalculatorColor.displayText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("REGISTERS")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(CalculatorColor.stackText)
+                    .tracking(1.1)
+                    .padding(.bottom, 4)
+
+                ForEach(viewModel.financialRegisterLines, id: \.self) { line in
+                    Text(line)
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundStyle(CalculatorColor.displayText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.black.opacity(0.24))
+        )
     }
 
     private func display(metrics: CalculatorLayoutMetrics) -> some View {
@@ -319,18 +449,71 @@ struct ContentView: View {
         .layoutPriority(1)
     }
 
+    private func financialCalculatorBody(availableWidth: CGFloat, availableHeight: CGFloat) -> some View {
+        let designWidth: CGFloat = 760
+        let designHeight: CGFloat = 372
+        let buttonHeight: CGFloat = 42
+        let clampedWidth = max(320, availableWidth)
+        let clampedHeight = max(240, availableHeight)
+        let widthScale = clampedWidth / designWidth
+        let heightScale = clampedHeight / designHeight
+        let scale = min(1, widthScale, heightScale)
+
+        return VStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                financialStatusPanel
+                display(metrics: metricsForLandscapeButtons(buttonHeight: buttonHeight))
+                    .frame(width: 188)
+            }
+
+            buttonGrid(metrics: metricsForLandscapeButtons(buttonHeight: buttonHeight))
+        }
+        .padding(14)
+        .frame(width: designWidth, height: designHeight, alignment: .top)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.12, green: 0.08, blue: 0.05),
+                            Color(red: 0.09, green: 0.06, blue: 0.04)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color(red: 0.44, green: 0.28, blue: 0.15), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.28), radius: 18, y: 12)
+        .scaleEffect(scale, anchor: .top)
+        .frame(width: clampedWidth, height: clampedHeight, alignment: .top)
+    }
+
     private func buttonGrid(metrics: CalculatorLayoutMetrics) -> some View {
-        Grid(horizontalSpacing: metrics.buttonSpacing, verticalSpacing: metrics.buttonSpacing) {
-            ForEach(Array(buttonRows().enumerated()), id: \.offset) { _, row in
+        Grid(
+            horizontalSpacing: metrics.buttonSpacing,
+            verticalSpacing: metrics.buttonSpacing
+        ) {
+            ForEach(Array(viewModel.mode.keypadRows.enumerated()), id: \.offset) { _, row in
                 GridRow {
-                    ForEach(Array(row.enumerated()), id: \.offset) { _, button in
-                        if let button {
-                            Button(action: button.action) {
-                                buttonLabelView(for: button, metrics: metrics)
+                    ForEach(row) { button in
+                        if let kind = CalculatorButtonKind.make(for: button, mode: viewModel.mode) {
+                            Button(action: action(for: button.role)) {
+                                buttonLabelView(for: button, kind: kind, metrics: metrics)
                             }
                             .frame(maxWidth: .infinity)
                             .accessibilityLabel(button.label)
-                            .buttonStyle(CalculatorPressStyle(color: button.kind.fillColor, span: button.span, height: metrics.buttonHeight))
+                            .buttonStyle(
+                                CalculatorPressStyle(
+                                    mode: viewModel.mode,
+                                    color: kind.fillColor(for: viewModel.mode),
+                                    span: button.span,
+                                    height: metrics.buttonHeight
+                                )
+                            )
                             .gridCellColumns(button.span)
                         } else {
                             Color.clear
@@ -343,101 +526,69 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func buttonLabelView(for button: CalculatorButtonDefinition, metrics: CalculatorLayoutMetrics) -> some View {
+    private func buttonLabelView(for button: CalculatorButtonSpec, kind: CalculatorButtonKind, metrics: CalculatorLayoutMetrics? = nil) -> some View {
+        let resolvedMetrics = metrics ?? CalculatorLayoutMetrics.make(
+            screenSize: CGSize(width: 390, height: 844),
+            safeAreaBottom: 34,
+            rowCount: viewModel.mode.keypadRows.count
+        )
         if let symbolName = operatorSymbolName(button.label) {
             Image(systemName: symbolName)
-                .font(.system(size: buttonFontSize(button.label, metrics: metrics), weight: .semibold))
-                .foregroundStyle(button.kind.textColor)
+                .font(.system(size: buttonFontSize(button.label, metrics: resolvedMetrics), weight: .semibold))
+                .foregroundStyle(kind.textColor(for: viewModel.mode))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
             Text(button.label)
-                .font(.system(size: buttonFontSize(button.label, metrics: metrics), weight: .medium, design: .rounded))
+                .font(.system(size: buttonFontSize(button.label, metrics: resolvedMetrics), weight: .medium, design: .rounded))
                 .minimumScaleFactor(0.45)
                 .lineLimit(1)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(button.kind.textColor)
+                .foregroundStyle(kind.textColor(for: viewModel.mode))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
     }
 
-    private func buttonRows() -> [[CalculatorButtonDefinition?]] {
-        switch viewModel.mode {
-        case .standard:
-            return [
-                utilityRow(),
-                [digitButton("7"), digitButton("8"), digitButton("9"), operationButton("÷", .divide)],
-                [digitButton("4"), digitButton("5"), digitButton("6"), operationButton("×", .multiply)],
-                [digitButton("1"), digitButton("2"), digitButton("3"), operationButton("−", .subtract)],
-                [toggleSignButton(), digitButton("0"), decimalButton(), operationButton("+", .add)],
-                [enterButton(span: 4)]
-            ]
-        case .hex:
-            return [
-                utilityRow(),
-                [digitButton("A"), digitButton("B"), digitButton("C"), operationButton("÷", .divide)],
-                [digitButton("D"), digitButton("E"), digitButton("F"), operationButton("×", .multiply)],
-                [digitButton("7"), digitButton("8"), digitButton("9"), operationButton("−", .subtract)],
-                [digitButton("4"), digitButton("5"), digitButton("6"), operationButton("+", .add)],
-                [digitButton("1"), digitButton("2"), digitButton("3"), digitButton("0")],
-                [toggleSignButton(), enterButton(span: 3)]
-            ]
-        case .binary:
-            return [
-                utilityRow(),
-                [digitButton("1"), digitButton("0"), toggleSignButton(), nil],
-                [operationButton("+", .add), operationButton("−", .subtract), operationButton("×", .multiply), operationButton("÷", .divide)],
-                [enterButton(span: 4)]
-            ]
-        }
-    }
-
-    private func utilityRow() -> [CalculatorButtonDefinition?] {
-        [
-            utilityButton("⌫", action: viewModel.backspace),
-            utilityButton("AC", action: viewModel.clearAll),
-            utilityButton("POP", action: viewModel.drop),
-            utilityButton("X/Y", action: viewModel.swap)
-        ]
-    }
-
-    private func utilityButton(_ label: String, action: @escaping () -> Void) -> CalculatorButtonDefinition {
-        CalculatorButtonDefinition(label: label, kind: .utility, action: action)
-    }
-
-    private func digitButton(_ digit: String) -> CalculatorButtonDefinition {
-        let kind: CalculatorButtonKind
-        if viewModel.mode == .hex, "ABCDEF".contains(digit) {
-            kind = .radixLetter
-        } else {
-            kind = .number
-        }
-
-        return CalculatorButtonDefinition(label: digit, kind: kind) {
-            viewModel.tapDigit(digit)
-        }
-    }
-
-    private func decimalButton() -> CalculatorButtonDefinition {
-        CalculatorButtonDefinition(label: ".", kind: .number, action: viewModel.tapDecimal)
-    }
-
-    private func toggleSignButton() -> CalculatorButtonDefinition {
-        CalculatorButtonDefinition(label: "+/−", kind: .utility, action: viewModel.toggleSign)
-    }
-
-    private func enterButton(span: Int) -> CalculatorButtonDefinition {
-        CalculatorButtonDefinition(label: "ENTER", span: span, kind: .enter, action: viewModel.enter)
-    }
-
-    private func operationButton(_ label: String, _ operation: RPNCalculator.BinaryOperation) -> CalculatorButtonDefinition {
-        CalculatorButtonDefinition(label: label, kind: .operation) {
-            viewModel.perform(operation)
+    private func action(for role: CalculatorButtonRole) -> () -> Void {
+        switch role {
+        case .utility(let action):
+            switch action {
+            case .backspace:
+                return viewModel.backspace
+            case .clearAll:
+                return viewModel.clearAll
+            case .drop:
+                return viewModel.drop
+            case .swap:
+                return viewModel.swap
+            case .toggleSign:
+                return viewModel.toggleSign
+            }
+        case .digit(let digit):
+            return { viewModel.tapDigit(digit) }
+        case .decimal:
+            return viewModel.tapDecimal
+        case .operation(let operation):
+            return { viewModel.perform(operation) }
+        case .financial(let variable):
+            return { viewModel.performFinancialAction(variable) }
+        case .enter:
+            return viewModel.enter
+        case .spacer:
+            return {}
         }
     }
 
     private func buttonFontSize(_ label: String, metrics: CalculatorLayoutMetrics) -> CGFloat {
+        if viewModel.mode == .financial {
+            if ["÷", "×", "−", "+"].contains(label) { return metrics.operatorFontSize }
+            if label == "ENTER" { return metrics.enterFontSize }
+            if ["PV", "PMT", "FV", "AC", "POP", "CHS"].contains(label) { return 22 }
+            if label == "x↔y" { return 18 }
+            return max(22, metrics.buttonFontSize - 2)
+        }
         if ["÷", "×", "−", "+"].contains(label) { return metrics.operatorFontSize }
         if label == "ENTER" { return metrics.enterFontSize }
+        if ["PV", "PMT", "FV"].contains(label) { return 24 }
         return metrics.buttonFontSize
     }
 
@@ -454,6 +605,322 @@ struct ContentView: View {
         default:
             return nil
         }
+    }
+
+    private func metricsForLandscapeButtons(buttonHeight: CGFloat) -> CalculatorLayoutMetrics {
+        CalculatorLayoutMetrics(
+            topPadding: 8,
+            bottomPadding: 8,
+            horizontalPadding: 16,
+            contentSpacing: 10,
+            buttonSpacing: 6,
+            headerHeight: 44,
+            stackPanelHeight: 96,
+            buttonHeight: buttonHeight,
+            buttonGridHeight: (buttonHeight * CGFloat(viewModel.mode.keypadRows.count)) + (6 * CGFloat(max(0, viewModel.mode.keypadRows.count - 1))),
+            displayAreaHeight: 96,
+            headerButtonSize: 44,
+            modeBadgeMinWidth: 112,
+            modeBadgeMinHeight: 36,
+            stackFontSize: 13,
+            stackSpacing: 3,
+            stackPanelPadding: 8,
+            displayErrorFontSize: 13,
+            displayErrorHeight: 14,
+            displayFontSize: 72,
+            displayMinHeight: 72,
+            enterFontSize: 24,
+            buttonFontSize: 30,
+            operatorFontSize: 38,
+            prefersScrollFallback: false
+        )
+    }
+
+}
+
+private struct FinancialToolsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var viewModel: CalculatorViewModel
+
+    @State private var cashFlowInitialAmountText = ""
+    @State private var newCashFlowAmountText = ""
+    @State private var newCashFlowCountText = "1"
+    @State private var npvRateText = ""
+    @State private var amortizationPeriodsText = "12"
+    @State private var percentBaseText = ""
+    @State private var percentRateText = ""
+    @State private var percentPartText = ""
+    @State private var percentTotalText = ""
+    @State private var percentOriginalText = ""
+    @State private var percentUpdatedText = ""
+    @State private var dateStart = Date()
+    @State private var dateEnd = Date()
+    @State private var dateOffsetDaysText = "30"
+    @State private var bondSettlement = Date()
+    @State private var bondMaturity = Calendar.current.date(byAdding: .year, value: 5, to: Date()) ?? Date()
+    @State private var bondCouponText = "5"
+    @State private var bondYieldText = "5"
+    @State private var bondPriceText = "100"
+    @State private var amortizationSummary: AmortizationSummary?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                quickActionsSection
+                memorySection
+                cashFlowSection
+                percentSection
+                dateSection
+                bondSection
+                amortizationSection
+            }
+            .scrollContentBackground(.hidden)
+            .background(CalculatorColor.background)
+            .navigationTitle("Financial Tools")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .onAppear {
+            syncFieldsFromModel()
+        }
+    }
+
+    private var quickActionsSection: some View {
+        Section("Stack And Mode") {
+            Picker("Payments", selection: paymentModeBinding) {
+                ForEach(PaymentMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            HStack(spacing: 10) {
+                financialActionButton("CLx") {
+                    viewModel.clearX()
+                }
+                financialActionButton("R↓") {
+                    viewModel.rollDown()
+                }
+                financialActionButton("EEX") {
+                    viewModel.enterExponent()
+                }
+            }
+        }
+    }
+
+    private var memorySection: some View {
+        Section("Memory Registers") {
+            ForEach(0..<10, id: \.self) { index in
+                HStack {
+                    Text("R\(index)")
+                    Spacer()
+                    if let value = viewModel.memoryRegisters[index] {
+                        Text(RPNNumberFormatter.formatDecimal(value))
+                            .foregroundStyle(CalculatorColor.stackText)
+                    } else {
+                        Text("—")
+                            .foregroundStyle(CalculatorColor.stackText)
+                    }
+                    Button("STO") {
+                        viewModel.storeMemory(index: index)
+                    }
+                    .buttonStyle(.bordered)
+                    Button("RCL") {
+                        viewModel.recallMemory(index: index)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+        }
+    }
+
+    private var cashFlowSection: some View {
+        Section("Cash Flow Worksheet") {
+            TextField("Initial Cash Flow", text: $cashFlowInitialAmountText)
+                .keyboardType(.numbersAndPunctuation)
+            Button("Save Initial Cash Flow") {
+                guard let value = decimal(from: cashFlowInitialAmountText) else { return }
+                viewModel.setCashFlowInitialAmount(value)
+            }
+
+            TextField("NPV Rate %", text: $npvRateText)
+                .keyboardType(.decimalPad)
+
+            HStack(spacing: 10) {
+                financialActionButton("NPV") {
+                    guard let rate = decimal(from: npvRateText) else { return }
+                    viewModel.calculateNetPresentValue(ratePercent: rate)
+                }
+                financialActionButton("IRR") {
+                    viewModel.calculateInternalRateOfReturn()
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Add Cash Flow")
+                    .font(.system(size: 14, weight: .semibold))
+                TextField("Amount", text: $newCashFlowAmountText)
+                    .keyboardType(.numbersAndPunctuation)
+                TextField("Count", text: $newCashFlowCountText)
+                    .keyboardType(.numberPad)
+                Button("Add Entry") {
+                    guard let amount = decimal(from: newCashFlowAmountText),
+                          let count = Int(newCashFlowCountText),
+                          count > 0 else { return }
+                    viewModel.addCashFlowEntry(amount: amount, count: count)
+                    newCashFlowAmountText = ""
+                    newCashFlowCountText = "1"
+                }
+            }
+
+            ForEach(viewModel.cashFlowEntries) { entry in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("CF \(RPNNumberFormatter.formatDecimal(entry.amount))")
+                        Spacer()
+                        Text("N \(entry.count)")
+                            .foregroundStyle(CalculatorColor.stackText)
+                    }
+                    Button("Delete Entry", role: .destructive) {
+                        viewModel.removeCashFlowEntry(id: entry.id)
+                    }
+                }
+            }
+        }
+    }
+
+    private var percentSection: some View {
+        Section("Percent") {
+            TextField("Base", text: $percentBaseText)
+                .keyboardType(.decimalPad)
+            TextField("Percent", text: $percentRateText)
+                .keyboardType(.decimalPad)
+            financialActionButton("Base × %") {
+                guard let base = decimal(from: percentBaseText),
+                      let percent = decimal(from: percentRateText) else { return }
+                viewModel.calculatePercent(base: base, percent: percent)
+            }
+
+            TextField("Part", text: $percentPartText)
+                .keyboardType(.decimalPad)
+            TextField("Total", text: $percentTotalText)
+                .keyboardType(.decimalPad)
+            financialActionButton("% Of Total") {
+                guard let part = decimal(from: percentPartText),
+                      let total = decimal(from: percentTotalText) else { return }
+                viewModel.calculatePercentOfTotal(part: part, total: total)
+            }
+
+            TextField("Original", text: $percentOriginalText)
+                .keyboardType(.decimalPad)
+            TextField("Updated", text: $percentUpdatedText)
+                .keyboardType(.decimalPad)
+            financialActionButton("Δ%") {
+                guard let original = decimal(from: percentOriginalText),
+                      let updated = decimal(from: percentUpdatedText) else { return }
+                viewModel.calculatePercentDifference(from: original, to: updated)
+            }
+        }
+    }
+
+    private var dateSection: some View {
+        Section("Dates") {
+            DatePicker("Start", selection: $dateStart, displayedComponents: .date)
+            DatePicker("End", selection: $dateEnd, displayedComponents: .date)
+            financialActionButton("Days Between") {
+                viewModel.calculateDaysBetween(from: dateStart, to: dateEnd)
+            }
+
+            TextField("Days To Add", text: $dateOffsetDaysText)
+                .keyboardType(.numberPad)
+            financialActionButton("Add Days") {
+                guard let days = Int(dateOffsetDaysText) else { return }
+                viewModel.calculateDateByAdding(days: days, to: dateStart)
+            }
+        }
+    }
+
+    private var bondSection: some View {
+        Section("Bonds") {
+            DatePicker("Settlement", selection: $bondSettlement, displayedComponents: .date)
+            DatePicker("Maturity", selection: $bondMaturity, displayedComponents: .date)
+            TextField("Coupon %", text: $bondCouponText)
+                .keyboardType(.decimalPad)
+            TextField("Yield %", text: $bondYieldText)
+                .keyboardType(.decimalPad)
+            financialActionButton("Bond Price") {
+                guard let coupon = decimal(from: bondCouponText),
+                      let yieldValue = decimal(from: bondYieldText) else { return }
+                viewModel.calculateBondPrice(
+                    settlement: bondSettlement,
+                    maturity: bondMaturity,
+                    couponRatePercent: coupon,
+                    yieldPercent: yieldValue
+                )
+            }
+
+            TextField("Price", text: $bondPriceText)
+                .keyboardType(.decimalPad)
+            financialActionButton("Bond Yield") {
+                guard let coupon = decimal(from: bondCouponText),
+                      let price = decimal(from: bondPriceText) else { return }
+                viewModel.calculateBondYield(
+                    settlement: bondSettlement,
+                    maturity: bondMaturity,
+                    couponRatePercent: coupon,
+                    price: price
+                )
+            }
+        }
+    }
+
+    private var amortizationSection: some View {
+        Section("Amortization") {
+            TextField("Periods", text: $amortizationPeriodsText)
+                .keyboardType(.numberPad)
+            financialActionButton("Calculate Amortization") {
+                guard let periods = Int(amortizationPeriodsText) else { return }
+                amortizationSummary = viewModel.calculateAmortization(periods: periods)
+            }
+
+            if let amortizationSummary {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Principal: \(RPNNumberFormatter.formatDecimal(amortizationSummary.principalPaid))")
+                    Text("Interest: \(RPNNumberFormatter.formatDecimal(amortizationSummary.interestPaid))")
+                    Text("Balance: \(RPNNumberFormatter.formatDecimal(amortizationSummary.remainingBalance))")
+                }
+                .foregroundStyle(CalculatorColor.stackText)
+            }
+        }
+    }
+
+    private var paymentModeBinding: Binding<PaymentMode> {
+        Binding(
+            get: { viewModel.paymentMode },
+            set: { viewModel.setPaymentMode($0) }
+        )
+    }
+
+    private func decimal(from text: String) -> Double? {
+        RPNNumberFormatter.parseDecimal(text)
+    }
+
+    private func financialActionButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .buttonStyle(.borderedProminent)
+            .tint(viewModel.mode.theme.accentBackground)
+    }
+
+    private func syncFieldsFromModel() {
+        cashFlowInitialAmountText = RPNNumberFormatter.formatDecimal(viewModel.cashFlowInitialAmount)
+        npvRateText = ""
     }
 }
 
@@ -505,7 +972,7 @@ private struct HistoryView: View {
                         ForEach(entries) { entry in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(alignment: .firstTextBaseline) {
-                                    Text(entry.displayExpression)
+                                    Text(entry.expression)
                                         .font(.system(size: 16, weight: .semibold, design: .monospaced))
                                         .foregroundStyle(CalculatorColor.displayText)
 
@@ -742,10 +1209,7 @@ private struct AboutView: View {
                     VStack(alignment: .leading, spacing: metrics.sectionSpacing) {
                         aboutHero(metrics: metrics)
 
-                        aboutCard(
-                            title: "Developer",
-                            metrics: metrics
-                        ) {
+                        aboutCard(title: "Developer", metrics: metrics) {
                             if let developerProfileURL {
                                 Link("@flatherskevin", destination: developerProfileURL)
                                     .font(.system(size: metrics.bodyFontSize, weight: .semibold, design: .rounded))
@@ -753,19 +1217,13 @@ private struct AboutView: View {
                             }
                         }
 
-                        aboutCard(
-                            title: "Version",
-                            metrics: metrics
-                        ) {
+                        aboutCard(title: "Version", metrics: metrics) {
                             Text(versionText)
                                 .font(.system(size: metrics.bodyFontSize, weight: .regular, design: .rounded))
                                 .foregroundStyle(.white.opacity(0.88))
                         }
 
-                        aboutCard(
-                            title: "Links",
-                            metrics: metrics
-                        ) {
+                        aboutCard(title: "Links", metrics: metrics) {
                             VStack(alignment: .leading, spacing: metrics.cardInnerSpacing) {
                                 if let issuesURL {
                                     Link("GitHub Issues", destination: issuesURL)
@@ -816,7 +1274,7 @@ private struct AboutView: View {
                 .font(.system(size: metrics.sectionTitleFontSize + 6, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white)
 
-            Text("Minimal reverse polish notation calculator for iPhone and iPad with Standard, Binary, and Hex modes.")
+            Text("Minimal reverse polish notation calculator for iPhone and iPad with Standard, Binary, Hex, and Financial modes.")
                 .font(.system(size: metrics.prefaceFontSize, weight: .regular, design: .rounded))
                 .foregroundStyle(.white.opacity(0.88))
                 .fixedSize(horizontal: false, vertical: true)
@@ -829,11 +1287,7 @@ private struct AboutView: View {
         )
     }
 
-    private func aboutCard<Content: View>(
-        title: String,
-        metrics: PrivacyPolicyLayoutMetrics,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
+    private func aboutCard<Content: View>(title: String, metrics: PrivacyPolicyLayoutMetrics, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: metrics.cardInnerSpacing) {
             Text(title)
                 .font(.system(size: metrics.sectionTitleFontSize, weight: .semibold, design: .rounded))

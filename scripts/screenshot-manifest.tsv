@@ -1,0 +1,13 @@
+# scenario|device_name|output_path|profile
+standard-mode-division|iPhone 17|screenshots/iphone/standard-mode-division.png|phone
+hex-mode-color-conversion|iPhone 17|screenshots/iphone/hex-mode-color-conversion.png|phone
+binary-mode-number-conversion|iPhone 17|screenshots/iphone/binary-mode-number-conversion.png|phone
+history-sheet-recent-calculations|iPhone 17|screenshots/iphone/history-sheet-recent-calculations.png|phone
+financial-mode-tvm-workflow|iPhone 17|screenshots/iphone/financial-mode-tvm-workflow.png|phone
+financial-tools-worksheet|iPhone 17|screenshots/iphone/financial-tools-worksheet.png|phone
+standard-mode-division|iPad Pro 13-inch (M5)|screenshots/ipad/ipad-standard-mode-division.png|ipad
+hex-mode-color-conversion|iPad Pro 13-inch (M5)|screenshots/ipad/ipad-hex-mode-color-conversion.png|ipad
+binary-mode-number-conversion|iPad Pro 13-inch (M5)|screenshots/ipad/ipad-binary-mode-number-conversion.png|ipad
+history-sheet-recent-calculations|iPad Pro 13-inch (M5)|screenshots/ipad/ipad-history-sheet-recent-calculations.png|ipad
+financial-mode-tvm-workflow|iPad Pro 13-inch (M5)|screenshots/ipad/ipad-financial-mode-tvm-workflow.png|ipad
+financial-tools-worksheet|iPad Pro 13-inch (M5)|screenshots/ipad/ipad-financial-tools-worksheet.png|ipad

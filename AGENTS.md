@@ -86,6 +86,15 @@ When touching calculator layout:
 5. Rebuild after each coherent change:
    `xcodebuild build -project 'Modern RPN.xcodeproj' -scheme 'Modern RPN' -sdk iphonesimulator`
 
+## Release / PR Rules
+
+- When opening a PR, bump the app version in `Modern RPN.xcodeproj/project.pbxproj`.
+- Update both version fields together:
+  - `MARKETING_VERSION` for the user-facing app version
+  - `CURRENT_PROJECT_VERSION` for the build number
+- Version bumps belong on the same feature/fix PR by default.
+- Only split version changes into a standalone branch/PR when the user explicitly asks for a standalone release/version PR.
+
 ## Avoid
 
 - blind tuning via screenshots alone
@@ -93,4 +102,3 @@ When touching calculator layout:
 - using unconstrained `.infinity` sizing inside stack or display sections
 - allowing radix values to become unreadable and trusting `minimumScaleFactor` to rescue them
 - hard-coding one-off sizes without checking how they affect the full height equation
-
