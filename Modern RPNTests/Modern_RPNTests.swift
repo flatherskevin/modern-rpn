@@ -129,9 +129,9 @@ final class RPNCalculatorTests: XCTestCase {
 
         let outcome = calculator.performFinancialAction(.futureValue)
 
-        XCTAssertEqual(outcome?.result, 1_102.5, accuracy: 0.000_001)
+        XCTAssertEqual(outcome?.result ?? .nan, 1_102.5, accuracy: 0.000_001)
         XCTAssertEqual(calculator.displayText, "1,102.5")
-        XCTAssertEqual(calculator.financialRegisters.value(for: .futureValue), 1_102.5, accuracy: 0.000_001)
+        XCTAssertEqual(calculator.financialRegisters.value(for: .futureValue) ?? .nan, 1_102.5, accuracy: 0.000_001)
     }
 
     func testFinancialQuickActionsSupportRollDownClearXAndExponentEntry() {
@@ -485,6 +485,33 @@ final class RPNCalculatorTests: XCTestCase {
 
         XCTAssertEqual(calculator.displayText, "F")
         XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: F"])
+    }
+
+    func testModeSwitchRejectsStackValuesThatDoNotFitTargetMode() {
+        let calculator = RPNCalculator()
+        push(Double(1 << 20), onto: calculator)
+
+        calculator.setMode(.hex)
+
+        XCTAssertEqual(calculator.mode, .standard)
+        XCTAssertEqual(calculator.errorMessage, "Value exceeds hex limit")
+    }
+
+    func testRestoreDropsNonRepresentableRadixValuesAndTypingBuffer() {
+        let calculator = RPNCalculator(mode: .standard)
+        let session = CalculatorSession(
+            mode: .binary,
+            stack: [3, 32_768],
+            inputBuffer: "1111111111111111",
+            isTyping: true
+        )
+
+        calculator.restore(session: session)
+
+        XCTAssertEqual(calculator.mode, .binary)
+        XCTAssertEqual(calculator.stack, [3])
+        XCTAssertEqual(calculator.displayText, "11")
+        XCTAssertFalse(calculator.isTyping)
     }
 
     private func push(_ value: Double, onto calculator: RPNCalculator) {
@@ -938,6 +965,25 @@ final class CalculatorViewModelTests: XCTestCase {
 }
 
 final class AppLaunchConfigurationTests: XCTestCase {
+    func testInvalidScreenshotScenarioFallsBackToDefaultConfiguration() {
+        let configuration = AppLaunchConfiguration(
+            arguments: [
+                "Modern RPN",
+                AppLaunchConfiguration.screenshotScenarioArgument,
+                "not-a-real-scenario"
+            ]
+        )
+
+        XCTAssertNil(configuration.userDefaults)
+        XCTAssertNil(configuration.seededSession)
+        XCTAssertNil(configuration.seededHistoryEntries)
+        XCTAssertNil(configuration.seededHistoryFilter)
+        if case .none = configuration.presentedSheet {
+        } else {
+            XCTFail("Expected invalid scenarios to fall back to the default launch configuration")
+        }
+    }
+
     func testDefaultsWhenNoScreenshotScenarioArgumentIsPresent() {
         let configuration = AppLaunchConfiguration(arguments: ["Modern RPN"])
 
@@ -968,6 +1014,23 @@ final class AppLaunchConfigurationTests: XCTestCase {
         }
         XCTAssertEqual(configuration.seededSession?.financialRegisters.paymentMode, .begin)
         XCTAssertEqual(configuration.seededHistoryEntries?.count, 4)
+    }
+
+    func testScreenshotScenarioCanPreopenHistorySheet() {
+        let configuration = AppLaunchConfiguration(
+            arguments: [
+                "Modern RPN",
+                AppLaunchConfiguration.screenshotScenarioArgument,
+                ScreenshotScenario.historySheetRecentCalculations.rawValue
+            ]
+        )
+
+        XCTAssertEqual(configuration.seededSession?.mode, .standard)
+        XCTAssertEqual(configuration.seededSession?.stack, [42])
+        if case .history = configuration.presentedSheet {
+        } else {
+            XCTFail("Expected history scenario to pre-present the history sheet")
+        }
     }
 }
 
