@@ -100,6 +100,11 @@ final class HistoryStore: ObservableObject {
         persist()
     }
 
+    func replaceEntries(_ newEntries: [HistoryEntry]) {
+        entries = Array(newEntries.prefix(maxEntries))
+        persist()
+    }
+
     func clear() {
         entries.removeAll()
         userDefaults.removeObject(forKey: storageKey)

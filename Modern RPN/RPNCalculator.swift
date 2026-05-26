@@ -87,7 +87,16 @@ struct FinancialRegisters: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        values = try container.decodeIfPresent([FinancialVariable: Double].self, forKey: .values) ?? [:]
+        if let decodedValues = try container.decodeIfPresent([FinancialVariable: Double].self, forKey: .values) {
+            values = decodedValues
+        } else if let legacyValues = try container.decodeIfPresent([String: Double].self, forKey: .values) {
+            values = legacyValues.reduce(into: [:]) { result, entry in
+                guard let variable = FinancialVariable(rawValue: entry.key) else { return }
+                result[variable] = entry.value
+            }
+        } else {
+            values = [:]
+        }
         paymentMode = try container.decodeIfPresent(PaymentMode.self, forKey: .paymentMode) ?? .end
         memoryRegisters = try container.decodeIfPresent([Int: Double].self, forKey: .memoryRegisters) ?? [:]
         cashFlowInitialAmount = try container.decodeIfPresent(Double.self, forKey: .cashFlowInitialAmount) ?? 0
@@ -1148,9 +1157,15 @@ final class RPNCalculator {
     }
 
     private func bondPeriods(settlement: Date, maturity: Date) throws -> Int {
-        let days = Calendar(identifier: .gregorian).dateComponents([.day], from: settlement, to: maturity).day ?? 0
-        let halfYearDays = 365.0 / 2
-        let periods = Int(ceil(Double(days) / halfYearDays))
+        let calendar = Calendar(identifier: .gregorian)
+        let components = calendar.dateComponents([.year, .month, .day], from: settlement, to: maturity)
+        let years = components.year ?? 0
+        let months = components.month ?? 0
+        let days = components.day ?? 0
+        let totalMonths = (years * 12) + months
+        let wholePeriods = totalMonths / 6
+        let hasPartialPeriod = (totalMonths % 6) != 0 || days > 0
+        let periods = wholePeriods + (hasPartialPeriod ? 1 : 0)
         guard periods > 0 else { throw FinancialSolverError.invalidBondInput }
         return periods
     }

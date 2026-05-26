@@ -178,11 +178,21 @@ private struct PrivacyPolicyLayoutMetrics {
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var viewModel = CalculatorViewModel()
+    @StateObject private var viewModel: CalculatorViewModel
     @State private var showingHistory = false
     @State private var showingAbout = false
     @State private var showingPrivacyPolicy = false
     @State private var showingFinancialTools = false
+
+    init(launchConfiguration: AppLaunchConfiguration = .currentProcess) {
+        _viewModel = StateObject(
+            wrappedValue: CalculatorViewModel(launchConfiguration: launchConfiguration)
+        )
+        _showingHistory = State(initialValue: launchConfiguration.presentedSheet == .history)
+        _showingAbout = State(initialValue: launchConfiguration.presentedSheet == .about)
+        _showingPrivacyPolicy = State(initialValue: launchConfiguration.presentedSheet == .privacyPolicy)
+        _showingFinancialTools = State(initialValue: launchConfiguration.presentedSheet == .financialTools)
+    }
 
     var body: some View {
         GeometryReader { geometry in

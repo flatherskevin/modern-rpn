@@ -20,10 +20,24 @@ final class CalculatorViewModel: ObservableObject {
 
     init(
         historyStore: HistoryStore? = nil,
-        sessionStore: AppSessionStore? = nil
+        sessionStore: AppSessionStore? = nil,
+        launchConfiguration: AppLaunchConfiguration
     ) {
-        self.historyStore = historyStore ?? HistoryStore()
-        self.sessionStore = sessionStore ?? AppSessionStore()
+        let userDefaults = launchConfiguration.userDefaults ?? .standard
+
+        self.historyStore = historyStore ?? HistoryStore(userDefaults: userDefaults)
+        self.sessionStore = sessionStore ?? AppSessionStore(userDefaults: userDefaults)
+
+        if let historyEntries = launchConfiguration.seededHistoryEntries {
+            self.historyStore.replaceEntries(historyEntries)
+        }
+        if let historyFilter = launchConfiguration.seededHistoryFilter {
+            self.sessionStore.saveHistoryFilter(historyFilter)
+        }
+        if let session = launchConfiguration.seededSession {
+            self.sessionStore.saveSession(session)
+        }
+
         self.historyFilter = self.sessionStore.loadHistoryFilter()
         if let session = self.sessionStore.loadSession() {
             calculator.restore(session: session)

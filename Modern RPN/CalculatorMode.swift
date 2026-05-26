@@ -8,7 +8,7 @@ struct ModeTheme {
     let accentText: Color
 }
 
-enum CalculatorOrientationPolicy {
+enum CalculatorOrientationPolicy: Equatable {
     case portrait
     case landscape
 
@@ -31,7 +31,7 @@ enum CalculatorOrientationPolicy {
     }
 }
 
-enum CalculatorLayoutStyle {
+enum CalculatorLayoutStyle: Equatable {
     case standard
     case financialLandscape
 }

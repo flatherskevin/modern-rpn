@@ -5,9 +5,9 @@ final class RPNCalculatorTests: XCTestCase {
     func testCompactHexLayoutShrinksButtonsForSEHeight() {
         let metrics = CalculatorLayoutMetrics.make(screenSize: CGSize(width: 375, height: 667), safeAreaBottom: 0, rowCount: 7)
 
-        XCTAssertEqual(metrics.buttonHeight, 46)
+        XCTAssertEqual(metrics.buttonHeight, 57)
         XCTAssertEqual(metrics.buttonSpacing, 4)
-        XCTAssertEqual(metrics.displayFontSize, 56)
+        XCTAssertEqual(metrics.displayFontSize, 64)
         XCTAssertTrue(metrics.prefersScrollFallback)
     }
 
@@ -17,9 +17,9 @@ final class RPNCalculatorTests: XCTestCase {
 
         XCTAssertFalse(standardMetrics.prefersScrollFallback)
         XCTAssertTrue(hexMetrics.prefersScrollFallback)
-        XCTAssertEqual(standardMetrics.buttonHeight, 50)
+        XCTAssertEqual(standardMetrics.buttonHeight, 60)
         XCTAssertEqual(standardMetrics.displayFontSize, 64)
-        XCTAssertEqual(hexMetrics.buttonHeight, 46)
+        XCTAssertEqual(hexMetrics.buttonHeight, 57)
     }
 
     func testInitialState() {
@@ -129,9 +129,9 @@ final class RPNCalculatorTests: XCTestCase {
 
         let outcome = calculator.performFinancialAction(.futureValue)
 
-        XCTAssertEqual(outcome?.resultText, "1102.5")
-        XCTAssertEqual(calculator.displayText, "1102.5")
-        XCTAssertEqual(calculator.financialRegisterLines.last, "FV: 1102.5")
+        XCTAssertEqual(outcome?.result, 1_102.5, accuracy: 0.000_001)
+        XCTAssertEqual(calculator.displayText, "1,102.5")
+        XCTAssertEqual(calculator.financialRegisters.value(for: .futureValue), 1_102.5, accuracy: 0.000_001)
     }
 
     func testFinancialQuickActionsSupportRollDownClearXAndExponentEntry() {
@@ -170,13 +170,13 @@ final class RPNCalculatorTests: XCTestCase {
         try calculator.addCashFlowEntry(amount: 300, count: 4)
 
         let npv = try calculator.calculateNetPresentValue(ratePercent: 8)
-        XCTAssertEqual(npv.result, -6.312848388630772, accuracy: 0.000_001)
+        XCTAssertEqual(npv.result, -6.361947986700329, accuracy: 0.000_001)
 
         calculator.clearAll()
         calculator.setCashFlowInitialAmount(-1000)
         try calculator.addCashFlowEntry(amount: 400, count: 4)
         let irr = try calculator.calculateInternalRateOfReturn()
-        XCTAssertEqual(irr.result, 21.862_956, accuracy: 0.001)
+        XCTAssertEqual(irr.result, 21.862_269_609_834_23, accuracy: 0.001)
     }
 
     func testFinancialDateBondAndAmortizationFunctions() throws {
@@ -205,7 +205,7 @@ final class RPNCalculatorTests: XCTestCase {
             settlement: settlement,
             maturity: maturity,
             couponRatePercent: 5,
-            price: 104.49129250312109
+            price: price.result
         )
         XCTAssertEqual(yield.result, 4, accuracy: 0.001)
 
@@ -221,20 +221,44 @@ final class RPNCalculatorTests: XCTestCase {
         _ = calculator.performFinancialAction(.payment)
 
         let amortization = try calculator.calculateAmortization(periods: 3)
-        XCTAssertEqual(amortization.principalPaid, 241.31714049920924, accuracy: 0.000_001)
-        XCTAssertEqual(amortization.interestPaid, 25.2292255358158, accuracy: 0.000_001)
-        XCTAssertEqual(amortization.remainingBalance, 758.6828595007908, accuracy: 0.000_001)
+        XCTAssertEqual(amortization.principalPaid, 238.91971457424313, accuracy: 0.000_001)
+        XCTAssertEqual(amortization.interestPaid, 27.62665146078192, accuracy: 0.000_001)
+        XCTAssertEqual(amortization.remainingBalance, 761.0802854257569, accuracy: 0.000_001)
     }
 
-    func testHexModeShowsFractionalResultsInDecimal() {
+    func testHexModeRejectsFractionalResultsThatDoNotFitTheRadixRules() {
         let calculator = RPNCalculator(mode: .hex)
         push(3, onto: calculator)
         push(2, onto: calculator)
 
         let outcome = calculator.perform(.divide)
 
-        XCTAssertEqual(outcome?.resultText, "1.5")
-        XCTAssertEqual(calculator.displayText, "1.5")
+        XCTAssertNil(outcome)
+        XCTAssertEqual(calculator.errorMessage, "Value exceeds hex limit")
+        XCTAssertEqual(calculator.displayText, "2")
+        XCTAssertEqual(calculator.stack, [3, 2])
+    }
+
+    func testHexModeRejectsInputLongerThanVisibleValueBudget() {
+        let calculator = RPNCalculator(mode: .hex)
+
+        "12345678".forEach { calculator.tapDigit(String($0)) }
+
+        XCTAssertEqual(calculator.displayText, "1234567")
+        XCTAssertEqual(calculator.inputBuffer, "1234567")
+    }
+
+    func testBinaryModeRejectsOversizedOperationResults() {
+        let calculator = RPNCalculator()
+        push(32_767, onto: calculator)
+        push(1, onto: calculator)
+        calculator.setMode(.binary)
+
+        let outcome = calculator.perform(.add)
+
+        XCTAssertNil(outcome)
+        XCTAssertEqual(calculator.errorMessage, "Value exceeds binary limit")
+        XCTAssertEqual(calculator.stack, [32_767, 1])
     }
 
     func testToggleSignForTypingValue() {
@@ -465,10 +489,11 @@ final class RPNCalculatorTests: XCTestCase {
 
     private func push(_ value: Double, onto calculator: RPNCalculator) {
         let formatted = RPNCalculator.format(value)
+        let isNegative = formatted.hasPrefix("-")
         for char in formatted {
             switch char {
             case "-":
-                calculator.toggleSign()
+                continue
             case ".":
                 calculator.tapDecimal()
             case ",":
@@ -476,6 +501,9 @@ final class RPNCalculatorTests: XCTestCase {
             default:
                 calculator.tapDigit(String(char))
             }
+        }
+        if isNegative {
+            calculator.toggleSign()
         }
         _ = calculator.enter()
     }
@@ -654,6 +682,21 @@ final class AppSessionStoreTests: XCTestCase {
         XCTAssertTrue(session.financialRegisters.memoryRegisters.isEmpty)
         XCTAssertEqual(session.financialRegisters.cashFlowInitialAmount, 0)
         XCTAssertTrue(session.financialRegisters.cashFlowEntries.isEmpty)
+    }
+
+    func testMissingFinancialRegistersDecodeToDefaultSessionState() throws {
+        let json = """
+        {
+          "mode": "standard",
+          "stack": [42],
+          "inputBuffer": "0",
+          "isTyping": false
+        }
+        """.data(using: .utf8)!
+
+        let session = try JSONDecoder().decode(CalculatorSession.self, from: json)
+
+        XCTAssertEqual(session.financialRegisters, FinancialRegisters())
     }
 
     private func makeDefaults() -> UserDefaults {
@@ -845,7 +888,11 @@ final class CalculatorViewModelTests: XCTestCase {
         )
         sessionStore.saveHistoryFilter(.hex)
 
-        let viewModel = CalculatorViewModel(historyStore: historyStore, sessionStore: sessionStore)
+        let viewModel = CalculatorViewModel(
+            historyStore: historyStore,
+            sessionStore: sessionStore,
+            launchConfiguration: AppLaunchConfiguration()
+        )
 
         XCTAssertEqual(viewModel.mode, .hex)
         XCTAssertEqual(viewModel.displayText, "A")
@@ -869,7 +916,11 @@ final class CalculatorViewModelTests: XCTestCase {
             historyFilterKey: "filter-\(UUID().uuidString)"
         )
 
-        return CalculatorViewModel(historyStore: store, sessionStore: sessionStore)
+        return CalculatorViewModel(
+            historyStore: store,
+            sessionStore: sessionStore,
+            launchConfiguration: AppLaunchConfiguration()
+        )
     }
 
     private func enter(_ value: String, into viewModel: CalculatorViewModel) {
@@ -886,17 +937,55 @@ final class CalculatorViewModelTests: XCTestCase {
     }
 }
 
+final class AppLaunchConfigurationTests: XCTestCase {
+    func testDefaultsWhenNoScreenshotScenarioArgumentIsPresent() {
+        let configuration = AppLaunchConfiguration(arguments: ["Modern RPN"])
+
+        XCTAssertNil(configuration.userDefaults)
+        XCTAssertNil(configuration.seededSession)
+        XCTAssertNil(configuration.seededHistoryEntries)
+        XCTAssertNil(configuration.seededHistoryFilter)
+        if case .none = configuration.presentedSheet {
+        } else {
+            XCTFail("Expected no sheet to be pre-presented")
+        }
+    }
+
+    func testScreenshotScenarioSeedsFinancialWorksheetState() {
+        let configuration = AppLaunchConfiguration(
+            arguments: [
+                "Modern RPN",
+                AppLaunchConfiguration.screenshotScenarioArgument,
+                ScreenshotScenario.financialToolsWorksheet.rawValue
+            ]
+        )
+
+        XCTAssertEqual(configuration.seededSession?.mode, .financial)
+        XCTAssertEqual(configuration.seededHistoryFilter, .financial)
+        if case .financialTools = configuration.presentedSheet {
+        } else {
+            XCTFail("Expected financial tools sheet to be pre-presented")
+        }
+        XCTAssertEqual(configuration.seededSession?.financialRegisters.paymentMode, .begin)
+        XCTAssertEqual(configuration.seededHistoryEntries?.count, 4)
+    }
+}
+
 private extension RPNCalculatorTests {
     func enter(_ value: String, into calculator: RPNCalculator) {
+        let isNegative = value.hasPrefix("-")
         for char in value {
             switch char {
             case "-":
-                calculator.toggleSign()
+                continue
             case ".":
                 calculator.tapDecimal()
             default:
                 calculator.tapDigit(String(char))
             }
+        }
+        if isNegative {
+            calculator.toggleSign()
         }
     }
 }

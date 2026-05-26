@@ -92,7 +92,8 @@ When touching calculator layout:
 - Update both version fields together:
   - `MARKETING_VERSION` for the user-facing app version
   - `CURRENT_PROJECT_VERSION` for the build number
-- Put version-only bumps on their own branch/PR when the user asks for a standalone release bump.
+- Version bumps belong on the same feature/fix PR by default.
+- Only split version changes into a standalone branch/PR when the user explicitly asks for a standalone release/version PR.
 
 ## Avoid
 
