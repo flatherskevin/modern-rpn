@@ -70,7 +70,12 @@ build_app() {
   local udid="$1"
 
   mkdir -p "$(dirname "$BUILD_LOG_PATH")"
-  rm -rf "$DERIVED_DATA_PATH"
+  if [ -d "$DERIVED_DATA_PATH" ]; then
+    chmod -R u+w "$DERIVED_DATA_PATH" >/dev/null 2>&1 || true
+    find "$DERIVED_DATA_PATH" -mindepth 1 -exec rm -rf {} +
+  else
+    rm -f "$DERIVED_DATA_PATH"
+  fi
 
   if ! xcodebuild build \
     -project "$PROJECT_PATH" \

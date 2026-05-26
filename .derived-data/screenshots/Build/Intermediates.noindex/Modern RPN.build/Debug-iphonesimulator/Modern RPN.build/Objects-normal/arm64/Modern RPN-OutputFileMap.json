@@ -1,0 +1,119 @@
+{
+  "" : {
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern RPN-primary.dia",
+    "emit-module-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern RPN-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern RPN-primary-emit-module.dia",
+    "pch" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern RPN-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern RPN-primary.swiftdeps"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/AppSessionStore.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/AppSessionStore.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/AppSessionStore.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/AppSessionStore.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/AppSessionStore.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/AppSessionStore.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/AppSessionStore.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/AppSessionStore.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/AppSessionStore~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/CalculatorLayoutMetrics.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorLayoutMetrics.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorLayoutMetrics.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorLayoutMetrics.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorLayoutMetrics.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorLayoutMetrics.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorLayoutMetrics.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorLayoutMetrics.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorLayoutMetrics~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/CalculatorMode.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorMode.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorMode.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorMode.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorMode.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorMode.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorMode.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorMode.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorMode~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/CalculatorViewModel.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorViewModel.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorViewModel.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorViewModel.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorViewModel.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorViewModel.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorViewModel.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorViewModel.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/CalculatorViewModel~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/ContentView.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/ContentView.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/ContentView.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/ContentView.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/ContentView~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/HistoryStore.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/HistoryStore.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/HistoryStore.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/HistoryStore.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/HistoryStore.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/HistoryStore.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/HistoryStore.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/HistoryStore.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/HistoryStore~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/Modern_RPNApp.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern_RPNApp.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern_RPNApp.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern_RPNApp.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern_RPNApp.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern_RPNApp.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern_RPNApp.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern_RPNApp.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/Modern_RPNApp~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/OrientationCoordinator.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationCoordinator.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationCoordinator.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationCoordinator.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationCoordinator.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationCoordinator.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationCoordinator.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationCoordinator.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationCoordinator~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/OrientationLockedRootView.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationLockedRootView.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationLockedRootView.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationLockedRootView.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationLockedRootView.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationLockedRootView.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationLockedRootView.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationLockedRootView.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/OrientationLockedRootView~partial.swiftmodule"
+  },
+  "/Users/flatherskevin/codebase/modern-rpn/Modern RPN/RPNCalculator.swift" : {
+    "const-values" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/RPNCalculator.swiftconstvalues",
+    "dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/RPNCalculator.d",
+    "diagnostics" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/RPNCalculator.dia",
+    "index-unit-output-path" : "/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/RPNCalculator.o",
+    "llvm-bc" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/RPNCalculator.bc",
+    "object" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/RPNCalculator.o",
+    "swift-dependencies" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/RPNCalculator.swiftdeps",
+    "swiftmodule" : "/Users/flatherskevin/codebase/modern-rpn/.derived-data/screenshots/Build/Intermediates.noindex/Modern RPN.build/Debug-iphonesimulator/Modern RPN.build/Objects-normal/arm64/RPNCalculator~partial.swiftmodule"
+  }
+}
