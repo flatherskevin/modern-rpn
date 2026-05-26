@@ -477,14 +477,23 @@ final class RPNCalculatorTests: XCTestCase {
         XCTAssertEqual(RPNCalculator.format(.nan), "NaN")
     }
 
-    func testModeSwitchReformatsExistingStack() {
+    func testModeSwitchRestoresIndependentStatePerMode() {
         let calculator = RPNCalculator()
         push(15, onto: calculator)
 
         calculator.setMode(.hex)
+        calculator.tapDigit("A")
+        _ = calculator.enter()
 
-        XCTAssertEqual(calculator.displayText, "F")
-        XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: F"])
+        calculator.setMode(.standard)
+
+        XCTAssertEqual(calculator.displayText, "15")
+        XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: 15"])
+
+        calculator.setMode(.hex)
+
+        XCTAssertEqual(calculator.displayText, "A")
+        XCTAssertEqual(calculator.stackLines, ["T:", "Z:", "Y:", "X: A"])
     }
 
     func testModeSwitchRejectsStackValuesThatDoNotFitTargetMode() {
@@ -493,17 +502,23 @@ final class RPNCalculatorTests: XCTestCase {
 
         calculator.setMode(.hex)
 
-        XCTAssertEqual(calculator.mode, .standard)
-        XCTAssertEqual(calculator.errorMessage, "Value exceeds hex limit")
+        XCTAssertEqual(calculator.mode, .hex)
+        XCTAssertNil(calculator.errorMessage)
+        XCTAssertEqual(calculator.stack, [])
     }
 
-    func testRestoreDropsNonRepresentableRadixValuesAndTypingBuffer() {
+    func testRestoreDropsNonRepresentableValuesFromPerModeState() {
         let calculator = RPNCalculator(mode: .standard)
         let session = CalculatorSession(
             mode: .binary,
-            stack: [3, 32_768],
-            inputBuffer: "1111111111111111",
-            isTyping: true
+            modeStates: [
+                .standard: CalculatorModeState(stack: [42], inputBuffer: "0", isTyping: false),
+                .binary: CalculatorModeState(
+                    stack: [3, 32_768],
+                    inputBuffer: "1111111111111111",
+                    isTyping: true
+                )
+            ]
         )
 
         calculator.restore(session: session)
@@ -685,6 +700,32 @@ final class AppSessionStoreTests: XCTestCase {
         XCTAssertEqual(store.loadSession(), session)
     }
 
+    func testSessionPersistsIndependentModeStates() {
+        let defaults = makeDefaults()
+        let store = AppSessionStore(
+            userDefaults: defaults,
+            sessionKey: "session-\(UUID().uuidString)",
+            historyFilterKey: "filter-\(UUID().uuidString)"
+        )
+
+        let session = CalculatorSession(
+            mode: .hex,
+            modeStates: [
+                .standard: CalculatorModeState(stack: [42], inputBuffer: "0", isTyping: false),
+                .hex: CalculatorModeState(stack: [255], inputBuffer: "FF", isTyping: true),
+                .binary: CalculatorModeState(stack: [10], inputBuffer: "1010", isTyping: true)
+            ]
+        )
+
+        store.saveSession(session)
+
+        let restored = store.loadSession()
+        XCTAssertEqual(restored?.mode, .hex)
+        XCTAssertEqual(restored?.state(for: .standard).stack, [42])
+        XCTAssertEqual(restored?.state(for: .hex).inputBuffer, "FF")
+        XCTAssertEqual(restored?.state(for: .binary).inputBuffer, "1010")
+    }
+
     func testFinancialRegistersDecodeFromOlderSessionPayload() throws {
         let json = """
         {
@@ -762,16 +803,25 @@ final class CalculatorViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.mode, .financial)
     }
 
-    func testModeSwitchUpdatesFormatting() {
+    func testModeSwitchRestoresIndependentViewModelState() {
         let viewModel = makeViewModel()
 
         viewModel.tapDigit("1")
         viewModel.tapDigit("5")
         viewModel.enter()
         viewModel.setMode(.hex)
+        viewModel.tapDigit("A")
+        viewModel.enter()
 
-        XCTAssertEqual(viewModel.displayText, "F")
-        XCTAssertEqual(viewModel.stackLines, ["T:", "Z:", "Y:", "X: F"])
+        viewModel.setMode(.standard)
+
+        XCTAssertEqual(viewModel.displayText, "15")
+        XCTAssertEqual(viewModel.stackLines, ["T:", "Z:", "Y:", "X: 15"])
+
+        viewModel.setMode(.hex)
+
+        XCTAssertEqual(viewModel.displayText, "A")
+        XCTAssertEqual(viewModel.stackLines, ["T:", "Z:", "Y:", "X: A"])
     }
 
     func testSuccessfulOperationUpdatesDisplayStackAndHistory() {

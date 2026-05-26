@@ -192,9 +192,13 @@ final class RPNCalculator {
     private(set) var isTyping = false
     private(set) var errorMessage: String?
     private(set) var financialRegisters = FinancialRegisters()
+    private var modeStates: [CalculatorMode: CalculatorModeState]
 
     init(mode: CalculatorMode = .standard) {
         self.mode = mode
+        self.modeStates = [
+            mode: CalculatorModeState()
+        ]
     }
 
     nonisolated deinit {}
@@ -241,52 +245,23 @@ final class RPNCalculator {
     }
 
     func setMode(_ mode: CalculatorMode) {
-        // Mode switches are blocked if the current visible value would violate the target mode's width rules.
-        if isTyping,
-           let value = self.mode.parse(inputBuffer),
-           !mode.canRepresent(value) {
-            errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
-            return
-        }
-
-        guard stack.allSatisfy(mode.canRepresent) else {
-            errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
-            return
-        }
-
-        if isTyping, let value = self.mode.parse(inputBuffer) {
-            inputBuffer = mode.format(value)
-        }
-
+        storeCurrentModeState()
         self.mode = mode
+        applyModeState(modeStates[mode] ?? CalculatorModeState())
         errorMessage = nil
     }
 
     func restore(session: CalculatorSession) {
+        modeStates = session.modeStates
         mode = session.mode
-        // Drop stale oversized values on restore so old sessions cannot reintroduce ellipsis regressions.
-        stack = session.stack.filter(mode.canRepresent)
-        if session.isTyping,
-           let value = mode.parse(session.inputBuffer),
-           mode.canRepresent(value) {
-            inputBuffer = session.inputBuffer
-            isTyping = true
-        } else {
-            inputBuffer = "0"
-            isTyping = false
-        }
-        financialRegisters = session.financialRegisters
+        applyModeState(sanitizedState(session.state(for: session.mode), for: session.mode))
         errorMessage = nil
     }
 
     var session: CalculatorSession {
-        CalculatorSession(
-            mode: mode,
-            stack: stack,
-            inputBuffer: inputBuffer,
-            isTyping: isTyping,
-            financialRegisters: financialRegisters
-        )
+        var persistedModeStates = modeStates
+        persistedModeStates[mode] = currentModeState
+        return CalculatorSession(mode: mode, modeStates: persistedModeStates)
     }
 
     func tapDigit(_ digit: String) {
@@ -455,6 +430,7 @@ final class RPNCalculator {
         isTyping = false
         errorMessage = nil
         financialRegisters = FinancialRegisters()
+        modeStates[mode] = currentModeState
     }
 
     func setPaymentMode(_ paymentMode: PaymentMode) {
@@ -464,6 +440,50 @@ final class RPNCalculator {
 
     func setErrorMessage(_ message: String) {
         errorMessage = message
+    }
+
+    private var currentModeState: CalculatorModeState {
+        CalculatorModeState(
+            stack: stack,
+            inputBuffer: inputBuffer,
+            isTyping: isTyping,
+            financialRegisters: financialRegisters
+        )
+    }
+
+    private func storeCurrentModeState() {
+        modeStates[mode] = currentModeState
+    }
+
+    private func applyModeState(_ state: CalculatorModeState) {
+        let sanitized = sanitizedState(state, for: mode)
+        stack = sanitized.stack
+        inputBuffer = sanitized.inputBuffer
+        isTyping = sanitized.isTyping
+        financialRegisters = sanitized.financialRegisters
+        modeStates[mode] = sanitized
+    }
+
+    private func sanitizedState(_ state: CalculatorModeState, for mode: CalculatorMode) -> CalculatorModeState {
+        let stack = state.stack.filter(mode.canRepresent)
+        let isTyping: Bool
+        let inputBuffer: String
+        if state.isTyping,
+           let value = mode.parse(state.inputBuffer),
+           mode.canRepresent(value) {
+            inputBuffer = state.inputBuffer
+            isTyping = true
+        } else {
+            inputBuffer = "0"
+            isTyping = false
+        }
+
+        return CalculatorModeState(
+            stack: stack,
+            inputBuffer: inputBuffer,
+            isTyping: isTyping,
+            financialRegisters: state.financialRegisters
+        )
     }
 
     func storeMemory(index: Int) throws {

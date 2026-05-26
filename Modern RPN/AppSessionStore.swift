@@ -55,10 +55,23 @@ enum HistoryModeFilter: String, CaseIterable, Codable, Identifiable {
 
 struct CalculatorSession: Codable, Equatable {
     let mode: CalculatorMode
-    let stack: [Double]
-    let inputBuffer: String
-    let isTyping: Bool
-    let financialRegisters: FinancialRegisters
+    let modeStates: [CalculatorMode: CalculatorModeState]
+
+    var stack: [Double] {
+        state(for: mode).stack
+    }
+
+    var inputBuffer: String {
+        state(for: mode).inputBuffer
+    }
+
+    var isTyping: Bool {
+        state(for: mode).isTyping
+    }
+
+    var financialRegisters: FinancialRegisters {
+        state(for: mode).financialRegisters
+    }
 
     init(
         mode: CalculatorMode,
@@ -68,14 +81,27 @@ struct CalculatorSession: Codable, Equatable {
         financialRegisters: FinancialRegisters = FinancialRegisters()
     ) {
         self.mode = mode
-        self.stack = stack
-        self.inputBuffer = inputBuffer
-        self.isTyping = isTyping
-        self.financialRegisters = financialRegisters
+        self.modeStates = [
+            mode: CalculatorModeState(
+                stack: stack,
+                inputBuffer: inputBuffer,
+                isTyping: isTyping,
+                financialRegisters: financialRegisters
+            )
+        ]
+    }
+
+    init(
+        mode: CalculatorMode,
+        modeStates: [CalculatorMode: CalculatorModeState]
+    ) {
+        self.mode = mode
+        self.modeStates = modeStates
     }
 
     private enum CodingKeys: String, CodingKey {
         case mode
+        case modeStates
         case stack
         case inputBuffer
         case isTyping
@@ -85,10 +111,65 @@ struct CalculatorSession: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         mode = try container.decode(CalculatorMode.self, forKey: .mode)
-        stack = try container.decode([Double].self, forKey: .stack)
-        inputBuffer = try container.decode(String.self, forKey: .inputBuffer)
-        isTyping = try container.decode(Bool.self, forKey: .isTyping)
-        financialRegisters = try container.decodeIfPresent(FinancialRegisters.self, forKey: .financialRegisters) ?? FinancialRegisters()
+        if let modeStates = try container.decodeIfPresent([CalculatorMode: CalculatorModeState].self, forKey: .modeStates) {
+            self.modeStates = modeStates
+        } else {
+            let stack = try container.decode([Double].self, forKey: .stack)
+            let inputBuffer = try container.decode(String.self, forKey: .inputBuffer)
+            let isTyping = try container.decode(Bool.self, forKey: .isTyping)
+            let financialRegisters = try container.decodeIfPresent(FinancialRegisters.self, forKey: .financialRegisters) ?? FinancialRegisters()
+            self.modeStates = [
+                mode: CalculatorModeState(
+                    stack: stack,
+                    inputBuffer: inputBuffer,
+                    isTyping: isTyping,
+                    financialRegisters: financialRegisters
+                )
+            ]
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(modeStates, forKey: .modeStates)
+        try container.encode(stack, forKey: .stack)
+        try container.encode(inputBuffer, forKey: .inputBuffer)
+        try container.encode(isTyping, forKey: .isTyping)
+        try container.encode(financialRegisters, forKey: .financialRegisters)
+    }
+
+    func state(for mode: CalculatorMode) -> CalculatorModeState {
+        modeStates[mode] ?? CalculatorModeState()
+    }
+
+    func withModeState(_ state: CalculatorModeState, for mode: CalculatorMode) -> CalculatorSession {
+        var updated = modeStates
+        updated[mode] = state
+        return CalculatorSession(mode: self.mode, modeStates: updated)
+    }
+
+    func switchingCurrentMode(to mode: CalculatorMode) -> CalculatorSession {
+        CalculatorSession(mode: mode, modeStates: modeStates)
+    }
+}
+
+struct CalculatorModeState: Codable, Equatable {
+    let stack: [Double]
+    let inputBuffer: String
+    let isTyping: Bool
+    let financialRegisters: FinancialRegisters
+
+    init(
+        stack: [Double] = [],
+        inputBuffer: String = "0",
+        isTyping: Bool = false,
+        financialRegisters: FinancialRegisters = FinancialRegisters()
+    ) {
+        self.stack = stack
+        self.inputBuffer = inputBuffer
+        self.isTyping = isTyping
+        self.financialRegisters = financialRegisters
     }
 }
 
