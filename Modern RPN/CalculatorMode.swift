@@ -8,7 +8,7 @@ struct ModeTheme {
     let accentText: Color
 }
 
-enum CalculatorOrientationPolicy {
+enum CalculatorOrientationPolicy: Equatable {
     case portrait
     case landscape
 
@@ -31,7 +31,7 @@ enum CalculatorOrientationPolicy {
     }
 }
 
-enum CalculatorLayoutStyle {
+enum CalculatorLayoutStyle: Equatable {
     case standard
     case financialLandscape
 }
@@ -87,6 +87,10 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
     case binary
     case hex
     case financial
+
+    // Radix modes are single-line displays with hard caps so the value row never falls back to ellipsis.
+    private static let binaryDigitLimit = 15
+    private static let hexDigitLimit = 7
 
     var id: String { rawValue }
 
@@ -259,9 +263,9 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
         case .standard:
             return true
         case .hex:
-            return isRadixBuffer(buffer, allowed: "0123456789ABCDEF")
+            return isRadixBuffer(buffer, allowed: "0123456789ABCDEF") && digitCount(in: buffer) < Self.hexDigitLimit
         case .binary:
-            return isRadixBuffer(buffer, allowed: "01")
+            return isRadixBuffer(buffer, allowed: "01") && digitCount(in: buffer) < Self.binaryDigitLimit
         case .financial:
             return true
         }
@@ -270,7 +274,7 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
     func parse(_ text: String) -> Double? {
         switch self {
         case .standard:
-            return Double(text)
+            return Double(text.replacingOccurrences(of: ",", with: ""))
         case .hex:
             return parseRadix(text, radix: 16) ?? Double(text)
         case .binary:
@@ -290,6 +294,32 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
             return formatRadix(value, radix: 2) ?? RPNNumberFormatter.formatDecimal(value)
         case .financial:
             return RPNNumberFormatter.formatDecimal(value)
+        }
+    }
+
+    func formatInput(_ text: String) -> String {
+        switch self {
+        case .standard:
+            return RPNNumberFormatter.formatDecimalInput(text)
+        case .hex, .binary, .financial:
+            return text
+        }
+    }
+
+    func canRepresent(_ value: Double) -> Bool {
+        switch self {
+        case .standard:
+            return true
+        case .hex:
+            // Keep hex values within the width budget that preserves the shared display font size.
+            guard let formatted = formatRadix(value, radix: 16) else { return false }
+            return formatted.count <= Self.hexDigitLimit
+        case .binary:
+            // Binary is intentionally stricter because the narrow glyphs still need to stay single-line.
+            guard let formatted = formatRadix(value, radix: 2) else { return false }
+            return formatted.count <= Self.binaryDigitLimit
+        case .financial:
+            return true
         }
     }
 
@@ -320,19 +350,84 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
 
         return digits.allSatisfy { allowed.contains($0) }
     }
+
+    private func digitCount(in buffer: String) -> Int {
+        let digits = buffer.hasPrefix("-") ? buffer.dropFirst() : Substring(buffer)
+        return digits.count
+    }
 }
 
 enum RPNNumberFormatter {
+    private static let integerFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        formatter.usesGroupingSeparator = true
+        formatter.maximumFractionDigits = 0
+        return formatter
+    }()
+
+    private static let decimalFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        formatter.usesGroupingSeparator = true
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 10
+        formatter.usesSignificantDigits = true
+        formatter.maximumSignificantDigits = 10
+        return formatter
+    }()
+
     static func formatDecimal(_ value: Double) -> String {
         if value == .infinity { return "∞" }
         if value == -.infinity { return "-∞" }
         if value.isNaN { return "NaN" }
 
         if value.rounded() == value {
-            return String(format: "%.0f", value)
+            return integerFormatter.string(from: NSNumber(value: value)) ?? String(format: "%.0f", value)
         }
 
-        return String(format: "%.10g", value)
+        return decimalFormatter.string(from: NSNumber(value: value)) ?? String(format: "%.10g", value)
+    }
+
+    static func formatDecimalInput(_ text: String) -> String {
+        if text.isEmpty { return text }
+
+        let isNegative = text.hasPrefix("-")
+        let unsignedText = isNegative ? String(text.dropFirst()) : text
+        let parts = unsignedText.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+        guard let integerPart = parts.first else { return text }
+
+        let groupedIntegerPart = groupedDigits(in: String(integerPart))
+        let fractionPart = parts.count == 2 ? String(parts[1]) : nil
+        let hasTrailingDecimal = unsignedText.hasSuffix(".")
+
+        var formatted = isNegative ? "-" + groupedIntegerPart : groupedIntegerPart
+        if hasTrailingDecimal {
+            formatted.append(".")
+        } else if let fractionPart {
+            formatted.append(".")
+            formatted.append(fractionPart)
+        }
+
+        return formatted
+    }
+
+    private static func groupedDigits(in digits: String) -> String {
+        guard !digits.isEmpty else { return "0" }
+
+        var result = ""
+        let reversedDigits = Array(digits.reversed())
+
+        for (index, character) in reversedDigits.enumerated() {
+            if index > 0, index.isMultiple(of: 3) {
+                result.append(",")
+            }
+            result.append(character)
+        }
+
+        return String(result.reversed())
     }
 }
 

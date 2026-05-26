@@ -92,7 +92,7 @@ struct CalculatorSession: Codable, Equatable {
     }
 }
 
-final class AppSessionStore {
+struct AppSessionStore {
     private let userDefaults: UserDefaults
     private let sessionKey: String
     private let historyFilterKey: String

@@ -87,7 +87,16 @@ struct FinancialRegisters: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        values = try container.decodeIfPresent([FinancialVariable: Double].self, forKey: .values) ?? [:]
+        if let decodedValues = try container.decodeIfPresent([FinancialVariable: Double].self, forKey: .values) {
+            values = decodedValues
+        } else if let legacyValues = try container.decodeIfPresent([String: Double].self, forKey: .values) {
+            values = legacyValues.reduce(into: [:]) { result, entry in
+                guard let variable = FinancialVariable(rawValue: entry.key) else { return }
+                result[variable] = entry.value
+            }
+        } else {
+            values = [:]
+        }
         paymentMode = try container.decodeIfPresent(PaymentMode.self, forKey: .paymentMode) ?? .end
         memoryRegisters = try container.decodeIfPresent([Int: Double].self, forKey: .memoryRegisters) ?? [:]
         cashFlowInitialAmount = try container.decodeIfPresent(Double.self, forKey: .cashFlowInitialAmount) ?? 0
@@ -192,7 +201,7 @@ final class RPNCalculator {
 
     var displayText: String {
         if isTyping {
-            return inputBuffer
+            return mode.formatInput(inputBuffer)
         }
         guard let top = stack.last else { return "0" }
         return mode.format(top)
@@ -232,18 +241,40 @@ final class RPNCalculator {
     }
 
     func setMode(_ mode: CalculatorMode) {
+        // Mode switches are blocked if the current visible value would violate the target mode's width rules.
+        if isTyping,
+           let value = self.mode.parse(inputBuffer),
+           !mode.canRepresent(value) {
+            errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
+            return
+        }
+
+        guard stack.allSatisfy(mode.canRepresent) else {
+            errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
+            return
+        }
+
         if isTyping, let value = self.mode.parse(inputBuffer) {
             inputBuffer = mode.format(value)
         }
 
         self.mode = mode
+        errorMessage = nil
     }
 
     func restore(session: CalculatorSession) {
         mode = session.mode
-        stack = session.stack
-        inputBuffer = session.inputBuffer
-        isTyping = session.isTyping
+        // Drop stale oversized values on restore so old sessions cannot reintroduce ellipsis regressions.
+        stack = session.stack.filter(mode.canRepresent)
+        if session.isTyping,
+           let value = mode.parse(session.inputBuffer),
+           mode.canRepresent(value) {
+            inputBuffer = session.inputBuffer
+            isTyping = true
+        } else {
+            inputBuffer = "0"
+            isTyping = false
+        }
         financialRegisters = session.financialRegisters
         errorMessage = nil
     }
@@ -269,7 +300,6 @@ final class RPNCalculator {
             }
 
             if !mode.canAppend(to: inputBuffer) {
-                inputBuffer = normalizedDigit
                 return
             }
 
@@ -333,6 +363,11 @@ final class RPNCalculator {
         if isTyping {
             guard let value = mode.parse(inputBuffer) else {
                 errorMessage = "Invalid number"
+                return nil
+            }
+            // The model enforces the same single-line representability rules as the view.
+            guard mode.canRepresent(value) else {
+                errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
                 return nil
             }
             stack.append(value)
@@ -495,6 +530,14 @@ final class RPNCalculator {
             stack.append(lhs)
             stack.append(rhs)
             errorMessage = "Cannot divide by zero"
+            return nil
+        }
+
+        // Reject oversized radix results before mutating the stack to keep display/layout assumptions valid.
+        guard mode.canRepresent(result) else {
+            stack.append(lhs)
+            stack.append(rhs)
+            errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
             return nil
         }
 
@@ -1114,9 +1157,15 @@ final class RPNCalculator {
     }
 
     private func bondPeriods(settlement: Date, maturity: Date) throws -> Int {
-        let days = Calendar(identifier: .gregorian).dateComponents([.day], from: settlement, to: maturity).day ?? 0
-        let halfYearDays = 365.0 / 2
-        let periods = Int(ceil(Double(days) / halfYearDays))
+        let calendar = Calendar(identifier: .gregorian)
+        let components = calendar.dateComponents([.year, .month, .day], from: settlement, to: maturity)
+        let years = components.year ?? 0
+        let months = components.month ?? 0
+        let days = components.day ?? 0
+        let totalMonths = (years * 12) + months
+        let wholePeriods = totalMonths / 6
+        let hasPartialPeriod = (totalMonths % 6) != 0 || days > 0
+        let periods = wholePeriods + (hasPartialPeriod ? 1 : 0)
         guard periods > 0 else { throw FinancialSolverError.invalidBondInput }
         return periods
     }
