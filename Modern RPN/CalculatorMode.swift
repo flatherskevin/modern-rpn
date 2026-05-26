@@ -379,6 +379,20 @@ enum RPNNumberFormatter {
         return formatter
     }()
 
+    private static let localeDecimalParser: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.locale = .current
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
+
+    private static let posixDecimalParser: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.numberStyle = .decimal
+        return formatter
+    }()
+
     static func formatDecimal(_ value: Double) -> String {
         if value == .infinity { return "∞" }
         if value == -.infinity { return "-∞" }
@@ -412,6 +426,21 @@ enum RPNNumberFormatter {
         }
 
         return formatted
+    }
+
+    static func parseDecimal(_ text: String) -> Double? {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+
+        if let number = localeDecimalParser.number(from: normalized) {
+            return number.doubleValue
+        }
+
+        if let number = posixDecimalParser.number(from: normalized) {
+            return number.doubleValue
+        }
+
+        return nil
     }
 
     private static func groupedDigits(in digits: String) -> String {

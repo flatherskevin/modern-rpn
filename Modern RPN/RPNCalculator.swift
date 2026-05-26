@@ -615,7 +615,8 @@ final class RPNCalculator {
     }
 
     @discardableResult
-    func calculatePercentOfTotal(part: Double, total: Double) -> OperationResult {
+    func calculatePercentOfTotal(part: Double, total: Double) throws -> OperationResult {
+        guard abs(total) >= 1e-12 else { throw FinancialSolverError.invalidMath }
         let result = (part / total) * 100
         stack.append(result)
         return OperationResult(
@@ -628,7 +629,8 @@ final class RPNCalculator {
     }
 
     @discardableResult
-    func calculatePercentDifference(from original: Double, to updated: Double) -> OperationResult {
+    func calculatePercentDifference(from original: Double, to updated: Double) throws -> OperationResult {
+        guard abs(original) >= 1e-12 else { throw FinancialSolverError.invalidMath }
         let result = ((updated - original) / original) * 100
         stack.append(result)
         return OperationResult(
@@ -1059,34 +1061,14 @@ final class RPNCalculator {
     private func netPresentValue(ratePercent: Double) throws -> Double {
         let rate = ratePercent / 100
         guard rate > -1 else { throw FinancialSolverError.invalidRate }
-
-        var result = financialRegisters.cashFlowInitialAmount
-        var period = 1
-
-        for entry in financialRegisters.cashFlowEntries {
-            guard entry.count > 0 else { throw FinancialSolverError.invalidCashFlow }
-            for _ in 0..<entry.count {
-                result += entry.amount / pow(1 + rate, Double(period))
-                period += 1
-            }
-        }
-
-        return result
+        return try discountedCashFlowSum(rate: rate)
     }
 
     private func internalRateOfReturn() throws -> Double {
         guard !financialRegisters.cashFlowEntries.isEmpty else { throw FinancialSolverError.invalidCashFlow }
 
         let function: (Double) -> Double = { rate in
-            var result = self.financialRegisters.cashFlowInitialAmount
-            var period = 1
-            for entry in self.financialRegisters.cashFlowEntries {
-                for _ in 0..<entry.count {
-                    result += entry.amount / pow(1 + rate, Double(period))
-                    period += 1
-                }
-            }
-            return result
+            (try? self.discountedCashFlowSum(rate: rate)) ?? .nan
         }
 
         var lower = -0.99
@@ -1188,6 +1170,22 @@ final class RPNCalculator {
         let periods = wholePeriods + (hasPartialPeriod ? 1 : 0)
         guard periods > 0 else { throw FinancialSolverError.invalidBondInput }
         return periods
+    }
+
+    private func discountedCashFlowSum(rate: Double) throws -> Double {
+        var result = financialRegisters.cashFlowInitialAmount
+        let discountBase = 1 + rate
+        var discountFactor = discountBase
+
+        for entry in financialRegisters.cashFlowEntries {
+            guard entry.count > 0 else { throw FinancialSolverError.invalidCashFlow }
+            for _ in 0..<entry.count {
+                result += entry.amount / discountFactor
+                discountFactor *= discountBase
+            }
+        }
+
+        return result
     }
 }
 

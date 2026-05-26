@@ -385,24 +385,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var financialRegisterPanel: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Financial Registers")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(CalculatorColor.stackText)
-                .textCase(.uppercase)
-
-            ForEach(viewModel.financialRegisterLines, id: \.self) { line in
-                Text(line)
-                    .font(.system(size: 15, weight: .medium, design: .monospaced))
-                    .foregroundStyle(CalculatorColor.displayText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(12)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private var financialStatusPanel: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
@@ -762,7 +744,7 @@ private struct FinancialToolsView: View {
     private var cashFlowSection: some View {
         Section("Cash Flow Worksheet") {
             TextField("Initial Cash Flow", text: $cashFlowInitialAmountText)
-                .keyboardType(.decimalPad)
+                .keyboardType(.numbersAndPunctuation)
             Button("Save Initial Cash Flow") {
                 guard let value = decimal(from: cashFlowInitialAmountText) else { return }
                 viewModel.setCashFlowInitialAmount(value)
@@ -785,7 +767,7 @@ private struct FinancialToolsView: View {
                 Text("Add Cash Flow")
                     .font(.system(size: 14, weight: .semibold))
                 TextField("Amount", text: $newCashFlowAmountText)
-                    .keyboardType(.decimalPad)
+                    .keyboardType(.numbersAndPunctuation)
                 TextField("Count", text: $newCashFlowCountText)
                     .keyboardType(.numberPad)
                 Button("Add Entry") {
@@ -927,9 +909,7 @@ private struct FinancialToolsView: View {
     }
 
     private func decimal(from text: String) -> Double? {
-        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalized.isEmpty else { return nil }
-        return Double(normalized)
+        RPNNumberFormatter.parseDecimal(text)
     }
 
     private func financialActionButton(_ title: String, action: @escaping () -> Void) -> some View {

@@ -52,8 +52,6 @@ final class OrientationCoordinator {
             }
         }
 
-        UIDevice.current.setValue(targetOrientation.rawValue, forKey: "orientation")
-
         if #unavailable(iOS 16.0) {
             UIViewController.attemptRotationToDeviceOrientation()
         }
@@ -87,11 +85,18 @@ final class OrientationCoordinator {
     }
 
     private func matches(_ policy: CalculatorOrientationPolicy, scene: UIWindowScene) -> Bool {
+        let interfaceOrientation: UIInterfaceOrientation
+        if #available(iOS 16.0, *) {
+            interfaceOrientation = scene.effectiveGeometry.interfaceOrientation
+        } else {
+            interfaceOrientation = scene.interfaceOrientation
+        }
+
         switch policy {
         case .portrait:
-            return scene.interfaceOrientation.isPortrait
+            return interfaceOrientation.isPortrait
         case .landscape:
-            return scene.interfaceOrientation.isLandscape
+            return interfaceOrientation.isLandscape
         }
     }
 }

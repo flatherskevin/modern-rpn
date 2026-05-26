@@ -183,12 +183,20 @@ final class CalculatorViewModel: ObservableObject {
     }
 
     func calculatePercentOfTotal(part: Double, total: Double) {
-        record(calculator.calculatePercentOfTotal(part: part, total: total))
+        do {
+            record(try calculator.calculatePercentOfTotal(part: part, total: total))
+        } catch {
+            calculator.setErrorMessage((error as? LocalizedError)?.errorDescription ?? "Percent error")
+        }
         refresh()
     }
 
     func calculatePercentDifference(from original: Double, to updated: Double) {
-        record(calculator.calculatePercentDifference(from: original, to: updated))
+        do {
+            record(try calculator.calculatePercentDifference(from: original, to: updated))
+        } catch {
+            calculator.setErrorMessage((error as? LocalizedError)?.errorDescription ?? "Percent error")
+        }
         refresh()
     }
 

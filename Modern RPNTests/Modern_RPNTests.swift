@@ -179,6 +179,31 @@ final class RPNCalculatorTests: XCTestCase {
         XCTAssertEqual(irr.result, 21.862_269_609_834_23, accuracy: 0.001)
     }
 
+    func testPercentCalculationsProduceExpectedResults() throws {
+        let calculator = RPNCalculator(mode: .financial)
+
+        let percent = calculator.calculatePercent(base: 200, percent: 15)
+        XCTAssertEqual(percent.result, 30, accuracy: 0.000_001)
+
+        let percentOfTotal = try calculator.calculatePercentOfTotal(part: 25, total: 200)
+        XCTAssertEqual(percentOfTotal.result, 12.5, accuracy: 0.000_001)
+
+        let percentDifference = try calculator.calculatePercentDifference(from: 80, to: 100)
+        XCTAssertEqual(percentDifference.result, 25, accuracy: 0.000_001)
+    }
+
+    func testPercentCalculationsRejectDivideByZeroInputs() {
+        let calculator = RPNCalculator(mode: .financial)
+
+        XCTAssertThrowsError(try calculator.calculatePercentOfTotal(part: 25, total: 0)) { error in
+            XCTAssertEqual((error as? LocalizedError)?.errorDescription, "Invalid financial inputs")
+        }
+
+        XCTAssertThrowsError(try calculator.calculatePercentDifference(from: 0, to: 100)) { error in
+            XCTAssertEqual((error as? LocalizedError)?.errorDescription, "Invalid financial inputs")
+        }
+    }
+
     func testFinancialDateBondAndAmortizationFunctions() throws {
         let calculator = RPNCalculator(mode: .financial)
         let calendar = Calendar(identifier: .gregorian)
