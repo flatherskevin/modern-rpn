@@ -242,7 +242,7 @@ final class RPNCalculatorTests: XCTestCase {
         _ = calculator.performFinancialAction(.presentValue)
         enter("0", into: calculator)
         _ = calculator.performFinancialAction(.futureValue)
-        enter("88.84878867834168", into: calculator)
+        enter("88.8487886783", into: calculator)
         _ = calculator.performFinancialAction(.payment)
 
         let amortization = try calculator.calculateAmortization(periods: 3)
@@ -267,10 +267,28 @@ final class RPNCalculatorTests: XCTestCase {
     func testHexModeRejectsInputLongerThanVisibleValueBudget() {
         let calculator = RPNCalculator(mode: .hex)
 
-        "12345678".forEach { calculator.tapDigit(String($0)) }
+        "123456789ABCDEF0".forEach { calculator.tapDigit(String($0)) }
 
-        XCTAssertEqual(calculator.displayText, "1234567")
-        XCTAssertEqual(calculator.inputBuffer, "1234567")
+        XCTAssertEqual(calculator.displayText, "123456789ABCDEF")
+        XCTAssertEqual(calculator.inputBuffer, "123456789ABCDEF")
+    }
+
+    func testStandardModeUsesGlobalInputDigitLimit() {
+        let calculator = RPNCalculator()
+
+        "1234567890123456".forEach { calculator.tapDigit(String($0)) }
+
+        XCTAssertEqual(calculator.displayText, "123,456,789,012,345")
+        XCTAssertEqual(calculator.inputBuffer, "123456789012345")
+    }
+
+    func testFinancialModeUsesGlobalInputDigitLimit() {
+        let calculator = RPNCalculator(mode: .financial)
+
+        "1234567890123456".forEach { calculator.tapDigit(String($0)) }
+
+        XCTAssertEqual(calculator.displayText, "123456789012345")
+        XCTAssertEqual(calculator.inputBuffer, "123456789012345")
     }
 
     func testBinaryModeRejectsOversizedOperationResults() {
@@ -576,6 +594,7 @@ final class RPNCalculatorTests: XCTestCase {
     }
 }
 
+@MainActor
 @MainActor
 final class HistoryStoreTests: XCTestCase {
     func testHistoryEntryDisplaysGroupedStandardValues() {

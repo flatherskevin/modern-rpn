@@ -117,6 +117,40 @@ private struct CalculatorPressStyle: ButtonStyle {
     }
 }
 
+private struct ModeBadge: View {
+    let mode: CalculatorMode
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        Text(mode.title)
+            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .tracking(0.1)
+            .lineLimit(1)
+            .foregroundStyle(mode.theme.accentText)
+            .padding(.horizontal, 16)
+            .frame(width: width, height: height)
+            .background {
+                Canvas { context, size in
+                    let inset = 0.5
+                    let rect = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+                    let path = Path(
+                        roundedRect: rect,
+                        cornerRadius: max(0, (size.height * 0.5) - inset)
+                    )
+
+                    context.fill(path, with: .color(mode.theme.accentBackground))
+                    context.stroke(path, with: .color(mode.theme.accentBorder), lineWidth: 1)
+                }
+            }
+            .id(mode.id)
+            .transaction { transaction in
+                transaction.animation = nil
+                transaction.disablesAnimations = true
+            }
+    }
+}
+
 private struct HistoryLayoutMetrics {
     let horizontalPadding: CGFloat
     let topPadding: CGFloat
@@ -199,7 +233,8 @@ struct ContentView: View {
             let metrics = CalculatorLayoutMetrics.make(
                 screenSize: geometry.size,
                 safeAreaBottom: geometry.safeAreaInsets.bottom,
-                rowCount: viewModel.mode.keypadRows.count
+                rowCount: viewModel.mode.keypadRows.count,
+                stackRowCount: stackRowCount
             )
 
             ZStack {
@@ -274,6 +309,13 @@ struct ContentView: View {
         }
     }
 
+    private var stackRowCount: Int {
+        if viewModel.mode == .financial {
+            return max(viewModel.stackLines.count, viewModel.financialRegisterLines.count)
+        }
+        return viewModel.stackLines.count
+    }
+
     private func header(metrics: CalculatorLayoutMetrics) -> some View {
         HStack {
             Menu {
@@ -302,26 +344,23 @@ struct ContentView: View {
             Menu {
                 ForEach(CalculatorMode.orderedModes) { mode in
                     Button {
-                        viewModel.setMode(mode)
+                        var transaction = Transaction(animation: nil)
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            viewModel.setMode(mode)
+                        }
                     } label: {
                         Text(mode.title)
                     }
                 }
             } label: {
-                let theme = viewModel.mode.theme
-                Text(viewModel.mode.title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .tracking(0.1)
-                    .lineLimit(1)
-                    .foregroundStyle(theme.accentText)
-                    .padding(.horizontal, 16)
-                    .frame(minWidth: metrics.modeBadgeMinWidth, minHeight: metrics.modeBadgeMinHeight)
-                    .background(theme.accentBackground, in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .stroke(theme.accentBorder, lineWidth: 1)
-                    }
+                ModeBadge(
+                    mode: viewModel.mode,
+                    width: metrics.modeBadgeMinWidth,
+                    height: metrics.modeBadgeMinHeight
+                )
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Mode")
             .accessibilityIdentifier("mode-picker")
 
@@ -352,7 +391,7 @@ struct ContentView: View {
             let contentHeight = max(0, proxy.size.height - (metrics.stackPanelPadding * 2))
             let rowHeight = max(
                 metrics.stackFontSize * 1.3,
-                (contentHeight - (metrics.stackSpacing * 3)) / 4
+                (contentHeight - (metrics.stackSpacing * CGFloat(max(0, metrics.stackRowCount - 1)))) / CGFloat(metrics.stackRowCount)
             )
 
             Group {
@@ -625,6 +664,7 @@ struct ContentView: View {
             stackFontSize: 13,
             stackSpacing: 3,
             stackPanelPadding: 8,
+            stackRowCount: stackRowCount,
             displayErrorFontSize: 13,
             displayErrorHeight: 14,
             displayFontSize: 72,
