@@ -270,6 +270,7 @@ final class RPNCalculator {
 
         if isTyping {
             if inputBuffer.hasSuffix("e") || inputBuffer.hasSuffix("e-") {
+                guard mode.canAppend(to: inputBuffer) else { return }
                 inputBuffer.append(normalizedDigit)
                 return
             }
@@ -585,6 +586,10 @@ final class RPNCalculator {
             }
 
             let solvedValue = try solveFinancialVariable(variable)
+            guard mode.canRepresent(solvedValue) else {
+                errorMessage = "Value exceeds \(mode.title.lowercased()) limit"
+                return nil
+            }
             financialRegisters.set(solvedValue, for: variable)
             stack.append(solvedValue)
 
@@ -814,11 +819,17 @@ final class RPNCalculator {
             guard let value = mode.parse(inputBuffer) else {
                 throw FinancialSolverError.invalidNumber
             }
+            guard mode.canRepresent(value) else {
+                throw FinancialSolverError.invalidNumber
+            }
             return value
         }
 
         guard let value = stack.last else {
             throw FinancialSolverError.enterValueFirst
+        }
+        guard mode.canRepresent(value) else {
+            throw FinancialSolverError.invalidNumber
         }
         return value
     }

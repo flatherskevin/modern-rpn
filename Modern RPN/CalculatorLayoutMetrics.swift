@@ -17,6 +17,7 @@ struct CalculatorLayoutMetrics {
     let stackFontSize: CGFloat
     let stackSpacing: CGFloat
     let stackPanelPadding: CGFloat
+    let stackRowCount: Int
     let displayErrorFontSize: CGFloat
     let displayErrorHeight: CGFloat
     let displayFontSize: CGFloat
@@ -29,7 +30,8 @@ struct CalculatorLayoutMetrics {
     static func make(
         screenSize: CGSize,
         safeAreaBottom: CGFloat,
-        rowCount: Int
+        rowCount: Int,
+        stackRowCount: Int = 4
     ) -> CalculatorLayoutMetrics {
         let compactWidth = screenSize.width <= 350
         let compactHeight = screenSize.height <= 700
@@ -44,8 +46,9 @@ struct CalculatorLayoutMetrics {
         let stackFontSize: CGFloat = compactHeight ? 12 : (compactLayout ? 13 : 15)
         let stackSpacing: CGFloat = compactHeight ? 2 : (compactLayout ? 3 : 4)
         let stackPanelPadding: CGFloat = compactHeight ? 6 : (compactLayout ? 8 : 10)
-        let stackLineHeight = stackFontSize * 1.15
-        let intrinsicStackPanelHeight = (stackLineHeight * 4) + (stackSpacing * 3) + (stackPanelPadding * 2)
+        let visibleStackRows = max(1, stackRowCount)
+        let minimumStackRowHeight = stackFontSize * 1.3
+        let intrinsicStackPanelHeight = (minimumStackRowHeight * CGFloat(visibleStackRows)) + (stackSpacing * CGFloat(max(0, visibleStackRows - 1))) + (stackPanelPadding * 2)
         let displayErrorHeight: CGFloat = compactHeight ? 12 : (compactLayout ? 14 : 16)
         let displayErrorFontSize: CGFloat = compactHeight ? 12 : (compactLayout ? 13 : 14)
 
@@ -133,6 +136,7 @@ struct CalculatorLayoutMetrics {
             stackFontSize: stackFontSize,
             stackSpacing: stackSpacing,
             stackPanelPadding: stackPanelPadding,
+            stackRowCount: visibleStackRows,
             displayErrorFontSize: displayErrorFontSize,
             displayErrorHeight: displayErrorHeight,
             displayFontSize: displayFontSize,

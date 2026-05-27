@@ -88,9 +88,8 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
     case hex
     case financial
 
-    // Radix modes are single-line displays with hard caps so the value row never falls back to ellipsis.
-    private static let binaryDigitLimit = 15
-    private static let hexDigitLimit = 7
+    // All modes share a hard visible-value budget so the display never falls back to ellipsis.
+    static let valueDigitLimit = 15
 
     var id: String { rawValue }
 
@@ -261,13 +260,13 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
     func canAppend(to buffer: String) -> Bool {
         switch self {
         case .standard:
-            return true
+            return isDecimalBuffer(buffer) && digitCount(in: buffer) < Self.valueDigitLimit
         case .hex:
-            return isRadixBuffer(buffer, allowed: "0123456789ABCDEF") && digitCount(in: buffer) < Self.hexDigitLimit
+            return isRadixBuffer(buffer, allowed: "0123456789ABCDEF") && digitCount(in: buffer) < Self.valueDigitLimit
         case .binary:
-            return isRadixBuffer(buffer, allowed: "01") && digitCount(in: buffer) < Self.binaryDigitLimit
+            return isRadixBuffer(buffer, allowed: "01") && digitCount(in: buffer) < Self.valueDigitLimit
         case .financial:
-            return true
+            return isDecimalBuffer(buffer) && digitCount(in: buffer) < Self.valueDigitLimit
         }
     }
 
@@ -309,17 +308,17 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
     func canRepresent(_ value: Double) -> Bool {
         switch self {
         case .standard:
-            return true
+            return decimalDigitCount(in: format(value)) <= Self.valueDigitLimit
         case .hex:
             // Keep hex values within the width budget that preserves the shared display font size.
             guard let formatted = formatRadix(value, radix: 16) else { return false }
-            return formatted.count <= Self.hexDigitLimit
+            return formatted.count <= Self.valueDigitLimit
         case .binary:
             // Binary is intentionally stricter because the narrow glyphs still need to stay single-line.
             guard let formatted = formatRadix(value, radix: 2) else { return false }
-            return formatted.count <= Self.binaryDigitLimit
+            return formatted.count <= Self.valueDigitLimit
         case .financial:
-            return true
+            return decimalDigitCount(in: format(value)) <= Self.valueDigitLimit
         }
     }
 
@@ -351,9 +350,33 @@ enum CalculatorMode: String, CaseIterable, Codable, Identifiable {
         return digits.allSatisfy { allowed.contains($0) }
     }
 
+    private func isDecimalBuffer(_ buffer: String) -> Bool {
+        let unsignedBuffer = buffer.hasPrefix("-") ? String(buffer.dropFirst()) : buffer
+        guard !unsignedBuffer.isEmpty else { return false }
+
+        let parts = unsignedBuffer.lowercased().split(separator: "e", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count <= 2, let mantissa = parts.first, isDecimalMantissa(mantissa) else { return false }
+
+        guard parts.count == 2 else { return true }
+        let exponent = parts[1]
+        if exponent.isEmpty || exponent == "-" { return true }
+        return exponent.allSatisfy(\.isNumber)
+    }
+
+    private func isDecimalMantissa(_ mantissa: Substring) -> Bool {
+        let parts = mantissa.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+        guard parts.count <= 2 else { return false }
+        return parts.allSatisfy { part in
+            part.isEmpty || part.allSatisfy(\.isNumber)
+        }
+    }
+
     private func digitCount(in buffer: String) -> Int {
-        let digits = buffer.hasPrefix("-") ? buffer.dropFirst() : Substring(buffer)
-        return digits.count
+        buffer.filter(\.isNumber).count
+    }
+
+    private func decimalDigitCount(in formattedValue: String) -> Int {
+        formattedValue.filter(\.isNumber).count
     }
 }
 
